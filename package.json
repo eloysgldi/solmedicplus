@@ -1,0 +1,27 @@
+{
+  "name": "solmedic",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Solmedic+ — farmácia própria com entrega: back end, painel da loja e app do cliente",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "dev": "node server/server.js",
+    "seed": "node server/seed.js",
+    "reset": "node server/seed.js --reset",
+    "test": "node server/seed.js --reset --silencioso && node test/semreceita.mjs && node test/fluxo.mjs && node test/conformidade.mjs && node test/experiencia.mjs && node test/armario.mjs && node test/gestao.mjs && node test/cliente-novo.mjs",
+    "test:fluxo": "node test/fluxo.mjs",
+    "test:receita": "node test/conformidade.mjs",
+    "test:otc": "node test/semreceita.mjs",
+    "test:experiencia": "node test/experiencia.mjs",
+    "test:armario": "node test/armario.mjs",
+    "test:gestao": "node test/gestao.mjs",
+    "fotos": "node server/fotos.js",
+    "test:sem-reset": "node test/semreceita.mjs && node test/fluxo.mjs && node test/conformidade.mjs && node test/experiencia.mjs && node test/armario.mjs && node test/gestao.mjs && node test/cliente-novo.mjs",
+    "start": "node server/boot.js",
+    "vapid": "node server/vapid.js",
+    "test:cliente": "node test/cliente-novo.mjs"
+  }
+}

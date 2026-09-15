@@ -1,0 +1,39 @@
+# Deploy no plano gratuito do Render.
+#
+# O que você precisa saber antes de subir:
+#
+#   · O disco do plano gratuito é EFÊMERO. A cada deploy, e a cada vez que
+#     o serviço acorda depois de hibernar, o data/solmedic.db volta do zero.
+#     Para demonstrar, é perfeito. Para vender de verdade, é o dia de pagar
+#     um disco persistente (US$ 1/mês por GB) ou trocar o SQLite por Postgres.
+#
+#   · O serviço gratuito hiberna depois de 15 minutos parado. A primeira
+#     visita depois disso espera uns 50 segundos. Avise quem for testar.
+#
+#   · SM_SEED=1 popula a base no boot (catálogo, lotes, carteira de clientes).
+#     Deixe ligado enquanto for demonstração; desligue quando os dados forem
+#     de verdade, senão todo restart apaga a operação.
+services:
+  - type: web
+    name: solmedic
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: echo "sem dependências: node:sqlite e node:http já vêm no Node"
+    startCommand: node server/boot.js
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: SM_SEED
+        value: "1"
+      - key: SM_RECEITA
+        value: "0"
+      # Opcionais. Sem eles o servidor gera as chaves de notificação no boot —
+      # o que, em disco efêmero, invalida a inscrição de todo aparelho já
+      # registrado a cada deploy. Rode `npm run vapid` e cole os dois valores
+      # no painel do Render quando quiser push estável.
+      - key: SM_VAPID_PUB
+        sync: false
+      - key: SM_VAPID_PRIV_PEM
+        sync: false

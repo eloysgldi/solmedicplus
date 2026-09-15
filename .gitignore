@@ -1,0 +1,11 @@
+node_modules/
+data/
+.env
+*.log
+
+# certificados do provedor de pagamento: nunca no repositorio
+*.pfx
+*.key
+*.crt
+*.csr
+Certificados/

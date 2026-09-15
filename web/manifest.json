@@ -1,0 +1,22 @@
+{
+  "name": "Solmedic+",
+  "short_name": "Solmedic+",
+  "description": "O remédio certo, sempre. Farmácia com entrega em 40 minutos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F5FB",
+  "theme_color": "#1138B4",
+  "lang": "pt-BR",
+  "categories": ["medical", "shopping", "health"],
+  "icons": [
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/marca.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Meus pedidos", "url": "/#pedidos" },
+    { "name": "Buscar remédio", "url": "/#busca" }
+  ]
+}
