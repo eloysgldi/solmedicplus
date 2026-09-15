@@ -65,7 +65,8 @@ ok(limpo.alertas.length === 0, 'carrinho sem conflito não inventa alerta');
 console.log(cor(1, '\n4. PIX'));
 const ppix = (await api('POST', '/api/pedidos', { token: cli, corpo: {
   pharmacy_id: loja.id, address_id: end.id, itens: [{ ean: VITC, qtd: 1 }], metodo: 'pix' } })).dados;
-ok(!ppix.pagamento, 'PIX não reserva nada na criação — não existe reserva em PIX');
+ok(ppix.pagamento?.metodo === 'pix' && ppix.pagamento.valor_capturado_centavos === 0,
+   'PIX nasce registrado e com zero capturado — não existe reserva em PIX');
 const px = (await api('POST', `/api/pedidos/${ppix.id}/pix`, { token: cli })).dados;
 ok(px.copia_e_cola?.startsWith('000201'), 'BR Code começa como manda o EMV');
 ok(px.copia_e_cola?.includes('br.gov.bcb.pix'), 'traz o domínio do arranjo PIX');

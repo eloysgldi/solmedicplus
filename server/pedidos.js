@@ -168,7 +168,11 @@ export function cria({ user, addressId, pharmacyId, itens, metodo = 'cartao', ca
 
     // No cartão a reserva vale desde já. No PIX não existe reserva: o código
     // só nasce quando o pedido pode ser cobrado de verdade.
-    if (metodo !== 'pix') pagamento.autoriza(oid, { metodo, cartaoFinal, valor: orc.total_centavos });
+    // Cartão é autorizado na hora. PIX também ganha a linha agora — com
+    // valor e nada capturado — porque sem ela o pedido não sabe que é PIX:
+    // a tela não mostrava o QR e a separação capturava como se fosse cartão.
+    pagamento.autoriza(oid, { metodo, cartaoFinal: metodo === 'pix' ? null : cartaoFinal,
+      valor: orc.total_centavos });
 
     const ator = { tipo: 'cliente', id: user.id, nome: user.nome };
     registra(oid, null, 'criado', ator, { total_centavos: orc.total_centavos, autorizado: true });
@@ -346,9 +350,12 @@ export function marcaPronto(orderId, ator, conferencia = []) {
   // a caixa sai da prateleira agora: FEFO escolhe o lote, o bipado manda
   estoque.baixaSeparacao(ped.pharmacy_id, orderId, conferencia, ator?.id);
   const o = recalcula(orderId);
-  // PIX já entrou (ou ainda vai entrar) por fora; captura é coisa de cartão
+  // Captura é coisa de cartão. Pedido no PIX nasce SEM linha de pagamento
+  // — ela só aparece quando o cliente gera a cobrança — e `pg` vem nulo:
+  // o teste antigo (`pg?.metodo !== 'pix'`) dava verdadeiro nesse caso e
+  // marcava como pago um PIX que ninguém tinha pagado.
   const pg = pagamento.doPedido(orderId);
-  if (pg?.metodo !== 'pix') pagamento.captura(orderId, o.total_centavos);
+  if (pg && pg.metodo !== 'pix') pagamento.captura(orderId, o.total_centavos);
   registra(orderId, o.status, o.status, ator, { evento: 'captura', valor_centavos: o.total_centavos });
   transiciona(orderId, 'pronto', ator);
   solta(avisa.paraCliente(o.user_id, 'conferindo', o, { itens: nomesDosItens(orderId) }));

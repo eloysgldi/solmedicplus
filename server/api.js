@@ -149,10 +149,21 @@ r.get('/api/farmacias', (req, res) => json(res, 200, todos(
   `SELECT id, nome_fantasia, bairro, cidade, uf, frete_centavos, frete_gratis_acima_centavos
      FROM pharmacies WHERE status='ativa' ORDER BY nome_fantasia`)));
 
+/**
+ * O que o app do cliente precisa saber antes de ter conta.
+ *
+ * A chave PIX NÃO entra aqui. Ela é usada só para montar o BR Code no
+ * servidor; devolvê-la numa rota pública seria entregar, para qualquer
+ * um que abrisse o endereço, o identificador da conta que recebe —
+ * matéria-prima de golpe de QR falso.
+ */
+const CONFIG_PUBLICA = ['receita_habilitada', 'loja_propria', 'area', 'pix_habilitado'];
+
 r.get('/api/config', (req, res) => {
   const loja = lojaDaCasa();
+  const todas = todasConfigs();
   json(res, 200, {
-    ...todasConfigs(),
+    ...Object.fromEntries(CONFIG_PUBLICA.map((k) => [k, todas[k]])),
     farmacia: loja ? { id: loja.id, nome: loja.nome_fantasia, bairro: loja.bairro } : null,
   });
 });
