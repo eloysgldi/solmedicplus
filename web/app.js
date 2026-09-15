@@ -100,8 +100,6 @@ function telaInicio() {
   return `
   <div class="tela" id="tela"><div class="rolagem">
     <div class="capa">
-      <div class="barra"><span class="hora">${relogio()}</span>
-        <span class="sinais">✦ ᯤ ▮</span></div>
       <div class="fila-marca">
         <span class="marca-topo">${marca({ tam: 32 })}</span>
         ${logotipo({ tam: 17 })}
@@ -230,7 +228,7 @@ function telaInicio() {
 
 function esqueletoInicio() {
   return `<div class="tela"><div class="rolagem">
-    <div class="capa"><div class="barra"><span class="hora">${relogio()}</span></div>
+    <div class="capa">
       <div class="local"><div class="txt">
         <div class="esqueleto" style="height:23px;width:58%;margin-bottom:8px"></div>
         <div class="esqueleto" style="height:13px;width:76%"></div></div></div>
@@ -268,7 +266,6 @@ function telaBusca() {
   const itens = aplicaFiltro(S.dados.busca?.itens || []);
   return `
   <div class="tela"><div class="rolagem">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca">
       <button class="voltar" data-ir="inicio" aria-label="Voltar">${IC.volta}</button>
       <label class="campo">${IC.busca}
@@ -534,7 +531,6 @@ function telaReceitas() {
   const lista = S.dados.receitas;
   return `
   <div class="tela"><div class="rolagem">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca"><h1>Minhas receitas</h1><button class="redondo" data-ir="carrinho" aria-label="Carrinho">${IC.carrinho}${totalItens() ? `<span class="selo">${totalItens()}</span>` : ''}</button></div>
     <p style="font-size:13px;color:var(--ink-2);padding:0 18px 14px;margin:0;line-height:1.5">
       A receita fica guardada com saldo. Você não precisa reenviar a cada compra.</p>
@@ -790,7 +786,6 @@ function telaPedidos() {
   const lista = S.dados.pedidos;
   return `
   <div class="tela"><div class="rolagem">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca"><h1>Meus pedidos</h1><button class="redondo" data-ir="carrinho" aria-label="Carrinho">${IC.carrinho}${totalItens() ? `<span class="selo">${totalItens()}</span>` : ''}</button></div>
     ${!lista ? '<div class="esqueleto" style="height:80px;margin:0 18px;border-radius:18px"></div>'
       : !lista.length ? `<div class="vazio"><span class="emoji">📦</span>Você ainda não fez nenhum pedido.</div>`
@@ -820,7 +815,6 @@ function telaAvisos() {
   };
   return `
   <div class="tela"><div class="rolagem">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca"><button class="voltar" data-ir="voltar">${IC.volta}</button><h1>Avisos</h1></div>
     ${!lista ? '<div class="esqueleto" style="height:90px;margin:0 18px;border-radius:18px"></div>'
       : !lista.length ? `<div class="vazio"><span class="emoji">🔔</span>
@@ -845,7 +839,6 @@ function telaConversa() {
   const hoje = new Date().toDateString();
   return `
   <div class="tela tela-conversa"><div class="rolagem conversa-rolagem" id="fio">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca">
       <button class="voltar" data-ir="voltar">${IC.volta}</button>
       <div style="flex:1;min-width:0">
@@ -934,7 +927,6 @@ function telaArmario() {
 
   return `
   <div class="tela"><div class="rolagem">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca"><button class="voltar" data-ir="voltar">${IC.volta}</button><h1>Seu armário</h1></div>
     <p class="sub-tela">O que você tem em casa, com o lote e a validade que a farmácia
       registrou na separação.</p>
@@ -977,7 +969,6 @@ function telaConta() {
   const ends = S.dados.enderecos ?? [];
   return `
   <div class="tela"><div class="rolagem">
-    <div class="barra" style="padding:14px 18px 0"><span class="hora">${relogio()}</span><span class="sinais">✦ ᯤ ▮</span></div>
     <div class="cabeca"><h1>Sua conta</h1></div>
 
     <div class="cartao-perfil">
@@ -2254,7 +2245,6 @@ setInterval(() => {
   setTimeout(() => { alvo.textContent = PALAVRAS[iw]; alvo.style.opacity = '1'; }, 190);
 }, 2600);
 setInterval(() => {
-  for (const h of document.querySelectorAll('.hora')) h.textContent = relogio();
 }, 20000);
 
 window.addEventListener('hashchange', () => {
