@@ -1392,6 +1392,10 @@ function montaRastreio() {
       destino: p?.endereco?.lat ? { lat: p.endereco.lat, lng: p.endereco.lng } : null,
     });
     // em rota, a moto continua andando devagar até chegar
+    // a moto só "anda sozinha" enquanto não existe posição de GPS. Assim
+    // que o entregador manda a primeira, a encenação para e o ponto passa
+    // a ser o real — rastreio que finge é pior que rastreio que falta
+    buscaMoto(p);
     if (p?.status === 'em_rota') setTimeout(() => mapaVivo?.anima(0.92, 26000), 700);
   } else if (mapaVivo) {
     mapaVivo.anima(alvo, 1500);
@@ -1528,6 +1532,10 @@ async function ligaCanalPessoal() {
     vibra(12);
     // com o app em segundo plano, o aviso sai na bandeja do sistema
     if (document.hidden) avisos.avisaLocal(nova);
+  }, (m) => {
+    // a moto andou de verdade. Se o pedido aberto na tela é esse, ela se
+    // move na hora — sem esperar a próxima leitura da API
+    if (S.dados.pedido?.id === m.order_id && mapaVivo) mapaVivo.poeMoto(m);
   });
 }
 
@@ -2551,4 +2559,22 @@ function cartaoLocalizacao(end) {
       <span>o GPS acerta o número e o complemento</span></span>
     ${IC.seta}
   </button>`;
+}
+
+/**
+ * Onde a moto está de verdade.
+ *
+ * O servidor só devolve a posição quando a loja ligou o rastreamento
+ * daquele entregador E ele está em turno. Nos outros casos devolve
+ * `{ rastreando: false }` e o mapa segue com a animação — que é uma
+ * indicação de progresso, não uma promessa de onde a pessoa está.
+ */
+async function buscaMoto(p) {
+  if (!p?.id || p.status !== 'em_rota') return;
+  const r = await api('GET', `/api/pedidos/${p.id}/entregador`).catch(() => null);
+  if (r?.lat && mapaVivo) {
+    mapaVivo.poeMoto(r);
+    const tira = telaAtual?.querySelector('#selo-rastreio');
+    if (tira) tira.textContent = 'ao vivo';
+  }
 }

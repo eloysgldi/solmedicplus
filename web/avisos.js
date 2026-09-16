@@ -101,13 +101,22 @@ export async function desligaAvisos(api) {
 }
 
 /** Canal pessoal: o aviso chega dentro do app mesmo sem push. */
-export function ouveAvisos(token, aoChegar) {
+/**
+ * O canal pessoal.
+ *
+ * Carrega dois tipos de recado no mesmo cano: o aviso que vira toast e
+ * sininho, e a posição do entregador. Abrir um segundo EventSource só
+ * para a moto seria uma segunda conexão aberta o dia inteiro, gastando
+ * bateria do cliente para transportar dois números.
+ */
+export function ouveAvisos(token, aoChegar, aoMover) {
   if (!token) return () => {};
   const fonte = new EventSource(`/api/notificacoes/stream?t=${encodeURIComponent(token)}`);
   fonte.onmessage = (ev) => {
     try {
       const d = JSON.parse(ev.data);
       if (d.tipo === 'notificacao') aoChegar(d.notificacao);
+      else if (d.tipo === 'entregador_moveu') aoMover?.(d);
     } catch {}
   };
   return () => fonte.close();

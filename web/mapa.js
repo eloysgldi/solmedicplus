@@ -157,6 +157,9 @@ export function criaMapa(container, opcoes = {}) {
 
   let atual = Math.max(0, Math.min(1, progresso));
   let quadro = null;
+  // enquanto nao chega posicao de GPS, a moto anda por interpolacao;
+  // quando chega, esta trava desliga a encenacao e manda o ponto real
+  let real = false;
 
   function posiciona(t) {
     const p = rota.getPointAtLength(total * t);
@@ -199,6 +202,7 @@ export function criaMapa(container, opcoes = {}) {
     get rua() { return !!percurso; },
     /** Leva a moto ate `alvo` em `ms`, com a mesma curva do resto do app. */
     anima(alvo, ms = 1400) {
+      if (real) return;
       cancelAnimationFrame(quadro);
       const de = atual, delta = Math.max(0, Math.min(1, alvo)) - de;
       if (Math.abs(delta) < 0.001) return;
@@ -217,6 +221,32 @@ export function criaMapa(container, opcoes = {}) {
     },
     /** Volta o mapa ao enquadramento que mostra o trajeto inteiro. */
     enquadra,
+
+    /**
+     * A moto na posição REAL, vinda do GPS do entregador.
+     *
+     * Quando isto é chamado, o desenho para de fingir: a moto deixa de
+     * andar por interpolação ao longo da linha e passa a ficar onde a
+     * pessoa está. A rota continua sendo pintada até o ponto mais
+     * próximo dela, para a linha andar junto sem mentir sobre o caminho.
+     */
+    poeMoto(p) {
+      if (!p?.lat) return;
+      real = true;
+      const q = px(p);
+      moto.setAttribute('transform', `translate(${q.x} ${q.y})`);
+      moto.classList.add('viva');
+      // acha o ponto da rota mais perto da moto: é até ali que ela andou
+      let melhor = 0, menor = Infinity;
+      for (let t = 0; t <= 1; t += 0.02) {
+        const r = rota.getPointAtLength(total * t);
+        const d = (r.x - q.x) ** 2 + (r.y - q.y) ** 2;
+        if (d < menor) { menor = d; melhor = t; }
+      }
+      atual = melhor;
+      rota.style.strokeDashoffset = total * (1 - atual);
+    },
+    get aoVivo() { return real; },
     destroi() { cancelAnimationFrame(quadro); },
   };
 }

@@ -378,8 +378,11 @@ a{color:inherit}
 .barra-compacta{
   position:absolute;top:0;left:0;right:0;z-index:25;display:flex;gap:10px;align-items:center;
   padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
-  background:rgba(241,245,242,.84);backdrop-filter:saturate(1.6) blur(16px);
-  -webkit-backdrop-filter:saturate(1.6) blur(16px);
+  /* fundo quase opaco. Com 84% e blur de 16, o conteúdo que passava por
+     baixo vazava por cima do nome e dos botões — parecia sujeira na tela,
+     não vidro */
+  background:rgba(244,247,252,.97);backdrop-filter:saturate(1.15) blur(8px);
+  -webkit-backdrop-filter:saturate(1.15) blur(8px);
   box-shadow:0 1px 0 rgba(218,226,240,.9), 0 8px 22px -14px rgba(7,15,30,.4);
   transform:translateY(-102%);transition:transform .32s cubic-bezier(.32,.72,0,1);
 }
@@ -1027,7 +1030,7 @@ a{color:inherit}
   flex:none;display:flex;gap:11px;align-items:center;
   padding:12px 16px calc(14px + env(safe-area-inset-bottom));
   background:color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter:saturate(1.6) blur(16px);-webkit-backdrop-filter:saturate(1.6) blur(16px);
+  backdrop-filter:saturate(1.15) blur(8px);-webkit-backdrop-filter:saturate(1.15) blur(8px);
   box-shadow:0 -1px 0 var(--line), 0 -12px 30px -20px rgba(7,15,30,.6);
 }
 .contador.grande{height:52px;border-radius:16px;padding:4px;background:var(--surface-2)}
@@ -1082,7 +1085,7 @@ a{color:inherit}
 }
 .barra-produto.presa{
   background:color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter:saturate(1.6) blur(16px);-webkit-backdrop-filter:saturate(1.6) blur(16px);
+  backdrop-filter:saturate(1.15) blur(8px);-webkit-backdrop-filter:saturate(1.15) blur(8px);
   box-shadow:0 1px 0 var(--line);
 }
 .acao-barra{
@@ -1471,3 +1474,11 @@ a{color:inherit}
   border-radius:50%;border:2.5px solid var(--brand)}
 .mini-alvo::after{content:"";position:absolute;inset:0;margin:auto;width:2.5px;height:24px;
   background:var(--brand);border-radius:2px;box-shadow:12px 0 0 -12px var(--brand)}
+
+/* a moto "viva" — quando a posição é o GPS do entregador, não a animação */
+.moto.viva .moto-pulso{animation:pulso-vivo 1.8s ease-out infinite}
+@keyframes pulso-vivo{
+  0%{r:14;opacity:.42}
+  100%{r:30;opacity:0}
+}
+.moto{transition:transform .9s cubic-bezier(.32,.72,0,1)}
