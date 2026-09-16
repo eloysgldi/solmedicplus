@@ -1121,6 +1121,7 @@ function telaLogin() {
     <div class="dica-conta">
       ${novo ? '' : 'Conta de teste já preenchida.<br>'}
       <a class="link-loja" href="painel.html">Sou a farmácia — abrir o painel →</a>
+      <a class="link-loja" href="entregador.html">Sou entregador — abrir as corridas →</a>
     </div>
   </div></div>`;
 }

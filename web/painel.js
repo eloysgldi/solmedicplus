@@ -64,6 +64,9 @@ function telaLogin(msg) {
         gerente@solmedic.com.br · loja123 &nbsp;|&nbsp; farmaceutica@solmedic.com.br · crf123 (farmacêutica)
         <br><a href="/" style="color:var(--brand);font-weight:700;text-decoration:none">
         ← Sou cliente, quero comprar</a>
+        &nbsp;·&nbsp;
+        <a href="/entregador.html" style="color:var(--brand);font-weight:700;text-decoration:none">
+        Sou entregador →</a>
       </p>
     </div>`;
   $('#f').addEventListener('submit', async (e) => {
