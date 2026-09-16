@@ -264,7 +264,7 @@ ok(apagou.status === 200 && apagou.dados.imagem_url === null,
 console.log(cor(1, '\n9. a loja no comando dela mesma'));
 const fretAntes = (await api('GET', `/api/comercio/${L}`, { token: ger })).dados.frete_centavos;
 const mudou = await api('PUT', `/api/comercio/${L}`, { token: ger, corpo: {
-  nome_fantasia: 'Solmedic+ Matriz', frete_centavos: 690, telefone: '85 3000-1234' } });
+  nome_fantasia: 'Solmedic+', frete_centavos: 690, telefone: '85 3000-1234' } });
 ok(mudou.status === 200 && mudou.dados.frete_centavos === 690,
    `frete mudou de ${fretAntes} para ${mudou.dados.frete_centavos} sem reiniciar nada`);
 

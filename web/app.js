@@ -1,5 +1,5 @@
 import { qrSvg } from './qr.js';
-import { embalagem, pictograma, CATS, IC, ABA } from './pkg.js';
+import { embalagem, pictograma, pictogramaSintoma, CATS, IC, ABA } from './pkg.js';
 import { marca, logotipo, sinal, abertura } from './marca.js';
 import { criaMapa, progressoDoStatus } from './mapa.js';
 import * as avisos from './avisos.js';
@@ -151,14 +151,12 @@ function telaInicio() {
       <span class="sep">·</span><span class="prazo-loja">chega em 40 min</span>
     </div>
 
-    ${capas()}
-
     <div class="secao"><h2>O que você está sentindo?</h2></div>
     <div class="trilho-sintomas escalona">
       ${(S.dados.sintomas ?? []).slice(0, 8).map((sm) => {
-        const cor = (CATS[sm.icone] ?? [])[1] ?? 'var(--brand)';
+        const cor = corDoSintoma(sm.id, sm.icone);
         return `<button class="pilula-sintoma" data-sintoma="${esc(sm.id)}">
-          <span class="ic" style="background:${cor}1F;color:${cor}">${pictograma(sm.icone)}</span>
+          <span class="ic" style="background:${cor}1F;color:${cor}">${pictogramaSintoma(sm.id, sm.icone)}</span>
           ${esc(sm.rotulo)}</button>`;
       }).join('')}
       <button class="pilula-sintoma outro" data-ir="conversa">
@@ -296,7 +294,7 @@ function telaBusca() {
           <div class="sintomas">${(S.dados.sintomas ?? []).map((sm) => {
             const [, cor] = CATS[sm.icone] ?? ['', 'var(--brand)'];
             return `<button class="sintoma" data-sintoma="${esc(sm.id)}">
-              <span class="ic" style="background:${cor}1F;color:${cor}">${pictograma(sm.icone)}</span>
+              <span class="ic" style="background:${cor}1F;color:${cor}">${pictogramaSintoma(sm.id, sm.icone)}</span>
               ${esc(sm.rotulo)}</button>`;
           }).join('')}</div>
           <p class="nota-area" style="margin:14px 18px 0">
@@ -1960,8 +1958,6 @@ function ligaFormulario() {
     });
   }
 
-  ligaCarteira();
-
   const bgps = palco.querySelector('#gps');
   if (bgps && !bgps.dataset.ligado) {
     bgps.dataset.ligado = '1';
@@ -2429,101 +2425,16 @@ function barraFarmaceutico() {
 }
 
 /**
- * As capas em carrossel.
+ * A cor de cada sintoma.
  *
- * Empilhadas como cartão na carteira: a de trás aparece um pouco por
- * baixo, e o movimento é de tirar uma da frente, não de deslizar uma
- * régua. O parallax é sutil de propósito — arte que anda mais que o
- * cartão dá a sensação de profundidade; muito mais que isso embrulha
- * o estômago em tela pequena.
+ * Vinha da categoria, e por isso dor de cabeça, febre e enjoo saíam
+ * vermelhos iguais — fileira monocromática, nada distinguível de
+ * relance. Aqui cada um tem a sua, escolhida pelo que a pessoa associa:
+ * febre é quente, gripe é fria, pele é areia.
  */
-function capas() {
-  const cs = S.dados.capas ?? CAPAS_PADRAO;
-  return `
-  <div class="carteira" id="carteira">
-    ${cs.map((c, i) => `
-      <article class="capa-cartao" data-i="${i}" style="--cor:${c.cor};--cor2:${c.cor2}">
-        <span class="capa-arte">${c.arte}</span>
-        <span class="capa-tx">
-          ${c.etiqueta ? `<span class="capa-etq">${esc(c.etiqueta)}</span>` : ''}
-          <b>${esc(c.titulo)}</b>
-          <span>${esc(c.texto)}</span>
-        </span>
-        ${c.ir ? `<span class="capa-cta" data-ir="${c.ir}">${esc(c.cta ?? 'Ver')}</span>` : ''}
-      </article>`).join('')}
-  </div>
-  <div class="carteira-pontos">${cs.map((_, i) =>
-    `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>`;
-}
-
-/**
- * As capas que vêm de fábrica.
- *
- * São promessas do serviço, não banner de fabricante: o que a farmácia
- * faz de diferente. Quando existir campanha cadastrada, ela entra na
- * frente — a estrutura é a mesma.
- */
-const CAPAS_PADRAO = [
-  {
-    etiqueta: 'chega hoje', titulo: 'Em 40 minutos na sua porta',
-    texto: 'Separado por gente com CRF, com lote e validade conferidos.',
-    cor: '#1138B4', cor2: '#2E6BFF', ir: 'busca', cta: 'Comprar agora',
-    arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
-      <circle cx="82" cy="34" r="30" fill="rgba(255,255,255,.14)"/>
-      <circle cx="96" cy="86" r="18" fill="rgba(255,255,255,.10)"/>
-      <g fill="none" stroke="rgba(255,255,255,.92)" stroke-width="5" stroke-linecap="round">
-        <path d="M30 78h44"/><path d="M38 78a8 8 0 1 0 16 0"/>
-        <path d="M24 56h30l8 22"/><path d="M70 48l12 10-12 10"/>
-      </g></svg>`,
-  },
-  {
-    etiqueta: 'o armário', titulo: 'A gente lembra o que você tem em casa',
-    texto: 'Avisa antes de vencer e, se um lote for recolhido, avisa só quem levou.',
-    cor: '#0A7A55', cor2: '#12B87E', ir: 'armario', cta: 'Ver meu armário',
-    arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
-      <rect x="28" y="22" width="64" height="76" rx="10" fill="rgba(255,255,255,.14)"/>
-      <g fill="none" stroke="rgba(255,255,255,.92)" stroke-width="5" stroke-linecap="round">
-        <path d="M40 44h40M40 60h40M40 76h24"/><path d="M60 22v76"/>
-      </g></svg>`,
-  },
-  {
-    etiqueta: 'receita na mão', titulo: 'Manda a foto, a gente monta o pedido',
-    texto: 'A farmacêutica lê, confere e separa. Você só confirma.',
-    cor: '#7A3BC7', cor2: '#A96BF0', ir: 'receitas', cta: 'Enviar receita',
-    arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
-      <circle cx="60" cy="60" r="34" fill="rgba(255,255,255,.14)"/>
-      <g fill="none" stroke="rgba(255,255,255,.94)" stroke-width="7" stroke-linecap="round">
-        <path d="M60 42v36M42 60h36"/>
-      </g></svg>`,
-  },
-];
-
-/**
- * O movimento da carteira.
- *
- * Um observador por cartão em vez de escutar o scroll: o navegador avisa
- * quando cada um cruza o meio da tela, e o parallax da arte anda com o
- * deslocamento. Escutar scroll a 60 quadros por segundo em lista
- * horizontal é o caminho curto para travar em aparelho fraco.
- */
-function ligaCarteira() {
-  const trilho = palco.querySelector('#carteira');
-  if (!trilho || trilho.dataset.ligado) return;
-  trilho.dataset.ligado = '1';
-  const pontos = [...(trilho.nextElementSibling?.children ?? [])];
-  const cartoes = [...trilho.children];
-
-  const anda = () => {
-    const meio = trilho.scrollLeft + trilho.clientWidth / 2;
-    cartoes.forEach((c, i) => {
-      const centro = c.offsetLeft + c.offsetWidth / 2;
-      const desvio = Math.max(-1, Math.min(1, (centro - meio) / c.offsetWidth));
-      // a arte anda mais que o cartão: é isso que dá a profundidade
-      c.style.setProperty('--desvio', desvio.toFixed(3));
-      c.classList.toggle('a-frente', Math.abs(desvio) < 0.34);
-      pontos[i]?.classList.toggle('on', Math.abs(desvio) < 0.34);
-    });
-  };
-  trilho.addEventListener('scroll', () => requestAnimationFrame(anda), { passive: true });
-  requestAnimationFrame(anda);
-}
+const COR_SINTOMA = {
+  dor_cabeca: '#C0392B', febre: '#E8601C', gripe: '#2E8BC0', garganta: '#C7386B',
+  azia: '#B8860B', enjoo: '#5B4FC4', pele: '#B07A4E', sol: '#E0A106',
+  corte: '#1F9E7A', bebe: '#2E6BFF', imunidade: '#7A3BC7',
+};
+const corDoSintoma = (id, cat) => COR_SINTOMA[id] ?? (CATS[cat] ?? [])[1] ?? 'var(--brand)';

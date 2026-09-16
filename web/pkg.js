@@ -218,3 +218,67 @@ export const IC = {
   copia: `<svg width="16" height="16" viewBox="0 0 24 24" ${T}><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 6.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h1.5"/></svg>`,
   estrela: `<svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.4l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.7l6-.8z"/></svg>`,
 };
+
+/* ============================================================
+   PICTOGRAMAS DE SINTOMA
+
+   Antes os sintomas pegavam emprestado o ícone da categoria, e o
+   resultado era dor de cabeça, febre e enjoo com o mesmo desenho — três
+   pilulas iguais lado a lado, que é o mesmo que não ter ícone.
+
+   Cada um aqui desenha a COISA, não a categoria: a cabeça com a dor
+   irradiando, o termômetro subindo, o nariz escorrendo. Traço de 1,7 em
+   caixa de 24, para todos terem o mesmo peso visual na fileira.
+   ============================================================ */
+const SINTOMA = {
+  // cabeça de perfil, com as ondas da dor saindo da têmpora
+  dor_cabeca: `<path d="M15.5 20.5v-2.2c0-1 .5-1.6 1.2-2.3A6.5 6.5 0 1 0 6.2 11c0 1.3.4 2.1.9 2.8.4.6.1 1.3-.6 1.4l-.9.2c-.6.1-.8.8-.4 1.2l1 .9v1.2c0 .9.7 1.6 1.6 1.6h1.8"/>
+    <path d="M18.6 4.4a4 4 0 0 1 0 5.7M21 2a7.4 7.4 0 0 1 0 10.5" opacity=".55"/>`,
+  // termômetro com a coluna cheia e o calor subindo
+  febre: `<path d="M12 14.8V5.4a2.2 2.2 0 1 1 4.4 0v9.4a4 4 0 1 1-4.4 0Z"/>
+    <path d="M14.2 16.6V9.2" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M6.6 5.6c.9.9.9 1.8 0 2.7s-.9 1.8 0 2.7M3 4.4c1.1 1.2 1.1 2.4 0 3.6s-1.1 2.4 0 3.6" opacity=".55"/>`,
+  // nariz de perfil com a gota: gripe é o que escorre
+  gripe: `<path d="M13.5 3.5v6.2c0 .9.4 1.4 1.1 2 .7.5 1 1 1 1.8 0 1-.8 1.7-1.8 1.7h-1.6v1.6c0 1-.8 1.9-1.9 1.9H8.7"/>
+    <path d="M6.4 12.6c-1.6 1.8-2.6 3.2-2.6 4.4a2.6 2.6 0 0 0 5.2 0c0-1.2-1-2.6-2.6-4.4Z"/>`,
+  // garganta: o pescoço e o ponto inflamado
+  garganta: `<path d="M9 3.2c0 2.4.3 3.6-1.3 5.2C6.2 9.9 5.6 11.4 5.6 13.6c0 4 2.9 7 6.4 7s6.4-3 6.4-7c0-2.2-.6-3.7-2.1-5.2C14.7 6.8 15 5.6 15 3.2"/>
+    <circle cx="12" cy="13.4" r="2.4" fill="currentColor" stroke="none" opacity=".9"/>`,
+  // estômago com a chama da azia
+  azia: `<path d="M8.4 4.6v5.2c0 3.2 1.6 5 4.4 5.4 2.4.4 3.8 1.8 3.8 3.4"/>
+    <path d="M5.6 9.4c0 5.2 3.1 8.6 7.6 8.6"opacity=".45"/>
+    <path d="M17.6 3.2c1.8 1.6 2.6 3 2.6 4.3a2.6 2.6 0 0 1-5.2 0c0-1.3.9-2.7 2.6-4.3Z"/>`,
+  // ondas do enjoo, com a cabeça girando
+  enjoo: `<circle cx="12" cy="8.4" r="4.4"/>
+    <path d="M10.3 7.6h.01M13.7 7.6h.01" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M4 16.6c1.6-1.6 3.2-1.6 4.8 0s3.2 1.6 4.8 0 3.2-1.6 4.8 0"/>
+    <path d="M4 20.2c1.6-1.6 3.2-1.6 4.8 0s3.2 1.6 4.8 0 3.2-1.6 4.8 0" opacity=".5"/>`,
+  // pele ressecada: a gota cortada
+  pele: `<path d="M12 3.4c3.4 3.8 5.2 6.6 5.2 8.8a5.2 5.2 0 0 1-10.4 0c0-2.2 1.8-5 5.2-8.8Z"/>
+    <path d="M9.4 12.4h5.2M11 15h2" opacity=".6"/>
+    <path d="M19.6 4.4 4.4 19.6" stroke-width="1.9"/>`,
+  // sol com o raio bloqueado pelo escudo
+  sol: `<circle cx="9.6" cy="9.6" r="3.6"/>
+    <path d="M9.6 2.2v1.8M9.6 15.2V17M2.2 9.6H4M15.2 9.6H17M4.4 4.4l1.3 1.3M13.5 13.5l1.3 1.3M14.8 4.4l-1.3 1.3M5.7 13.5l-1.3 1.3" opacity=".7"/>
+    <path d="M17.4 12.6c1.9.7 3.2 1.2 3.2 1.2s.3 4.6-3.2 6.6c-3.5-2-3.2-6.6-3.2-6.6s1.3-.5 3.2-1.2Z"/>`,
+  // curativo em diagonal
+  corte: `<rect x="2.6" y="9" width="18.8" height="6" rx="3" transform="rotate(-38 12 12)"/>
+    <path d="M10.4 10.4h.01M13.6 13.6h.01M13.6 10.4h.01M10.4 13.6h.01" stroke-width="2.2" stroke-linecap="round"/>`,
+  // mamadeira
+  bebe: `<path d="M9.4 3.6h5.2M10.4 3.6c0 1.4-.6 2-1.6 2.6v12.2a2 2 0 0 0 2 2h2.4a2 2 0 0 0 2-2V6.2c-1-.6-1.6-1.2-1.6-2.6"/>
+    <path d="M9 9.6h6M11.2 12.4h3.8M11.2 15.2h3.8" opacity=".55"/>`,
+  // escudo com o raio: imunidade e disposição
+  imunidade: `<path d="M12 2.8 4.6 5.6v6c0 4.4 3.1 8.2 7.4 9.6 4.3-1.4 7.4-5.2 7.4-9.6v-6L12 2.8Z"/>
+    <path d="m12.8 8.2-3 4.4h2.4l-1 3.6 3.2-4.6h-2.5l.9-3.4Z" fill="currentColor" stroke="none"/>`,
+};
+
+/**
+ * O ícone de um sintoma. Volta para o da categoria só se alguém
+ * cadastrar um sintoma novo antes de desenhar o dele.
+ */
+export function pictogramaSintoma(id, categoria) {
+  const d = SINTOMA[id];
+  if (!d) return pictograma(categoria);
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+}

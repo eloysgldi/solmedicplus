@@ -185,10 +185,38 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
       </svg>
     </div>
     <div class="nav-seta">
-      <svg viewBox="0 0 44 44" aria-hidden="true">
-        <circle cx="22" cy="22" r="19" fill="rgba(46,107,255,.22)"/>
-        <circle cx="22" cy="22" r="13" fill="#0B1220"/>
-        <path d="M22 10 L31 32 L22 26 L13 32 Z" fill="#63E6FF"/>
+      <svg viewBox="0 0 76 76" aria-hidden="true">
+        <defs>
+          <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+            <stop offset="55%" stop-color="#2E6BFF" stop-opacity=".30"/>
+            <stop offset="100%" stop-color="#2E6BFF" stop-opacity="0"/>
+          </radialGradient>
+          <!-- as duas faces da seta: a da esquerda pega a luz, a da
+               direita fica na sombra. É só isso que faz um triângulo
+               plano virar um volume -->
+          <linearGradient id="faceClara" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#BFF4FF"/><stop offset="1" stop-color="#63E6FF"/>
+          </linearGradient>
+          <linearGradient id="faceEscura" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2E8FD6"/><stop offset="1" stop-color="#1B5FA8"/>
+          </linearGradient>
+          <filter id="sombraSeta" x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3.4" flood-color="#04101F" flood-opacity=".85"/>
+          </filter>
+        </defs>
+
+        <circle cx="38" cy="38" r="36" fill="url(#halo)"/>
+        <!-- a base elíptica é a sombra projetada no chão: sem ela a seta
+             parece adesivo colado na tela, não objeto sobre o mapa -->
+        <ellipse cx="38" cy="52" rx="15" ry="5" fill="#04101F" opacity=".45"/>
+        <circle cx="38" cy="38" r="21" fill="#0B1220" opacity=".9"/>
+        <circle cx="38" cy="38" r="21" fill="none" stroke="#2E6BFF" stroke-width="1.6" opacity=".55"/>
+
+        <g filter="url(#sombraSeta)">
+          <path d="M38 17 L51 49 L38 42 Z" fill="url(#faceEscura)"/>
+          <path d="M38 17 L25 49 L38 42 Z" fill="url(#faceClara)"/>
+          <path d="M38 17 L38 42" stroke="#EAFBFF" stroke-width="1" opacity=".5"/>
+        </g>
       </svg>
     </div>`;
 
@@ -271,14 +299,106 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
       svg.setAttribute('height', alt);
       svg.setAttribute('viewBox', `0 0 ${larg} ${alt}`);
       // o piloto fica no terco de baixo: o que importa e o que vem pela frente
-      palco.style.transform = `translateY(18%) rotate(${-giro}deg)`;
+      palco.style.transform = `translateY(12%) rotate(${-giro}deg)`;
       pintaTelhas();
       desenhaRota(andadoAte);
     },
     poeRota(lista, listaParadas = []) { pontos = lista ?? []; paradas = listaParadas; desenhaRota(); },
     /** Solta o giro: o mapa volta a apontar para o norte. */
-    soltaNorte() { seguindo = false; giro = 0; palco.style.transform = 'translateY(18%)'; },
+    soltaNorte() { seguindo = false; giro = 0; palco.style.transform = 'translateY(12%)'; },
     voltaASeguir() { seguindo = true; },
     get seguindo() { return seguindo; },
   };
 }
+
+/* ============================================================
+   VOZ
+
+   O navegador já traz síntese de fala (`speechSynthesis`) — não precisa
+   de biblioteca nem de servidor. A voz vem do sistema: no Android é a do
+   Google, no iPhone é a da Siri, e em português do Brasil as duas soam
+   bem.
+
+   Duas regras que fazem diferença em cima de uma moto:
+
+     · falar CEDO. "Vire à direita" dito em cima da esquina é inútil;
+       o aviso sai a 300 m, de novo a 80 m, e a confirmação na hora;
+     · nunca repetir a mesma frase. Navegador que fica repetindo vira
+       ruído, e ruído a pessoa desliga — perdendo também o aviso que
+       importava.
+   ============================================================ */
+
+const VOZ = {
+  ligada: localStorage.getItem('sm_voz') !== '0',
+  escolhida: null,
+  dito: new Set(),
+};
+
+/**
+ * Escolhe a voz.
+ *
+ * Prefere feminina em português do Brasil, que é a convenção dos
+ * navegadores de rua no país e a que as pessoas esperam ouvir. A lista
+ * chega assíncrona no Chrome, daí o evento.
+ */
+function escolheVoz() {
+  const vozes = speechSynthesis.getVoices();
+  if (!vozes.length) return null;
+  const br = vozes.filter((v) => /pt[-_]?BR/i.test(v.lang));
+  const fem = br.find((v) => /female|feminin|luciana|maria|francisca|vit[óo]ria|camila|fernanda/i.test(v.name));
+  VOZ.escolhida = fem ?? br[0] ?? vozes.find((v) => /^pt/i.test(v.lang)) ?? null;
+  return VOZ.escolhida;
+}
+if ('speechSynthesis' in window) {
+  escolheVoz();
+  speechSynthesis.addEventListener('voiceschanged', escolheVoz);
+}
+
+export function falaLigada() { return VOZ.ligada; }
+
+export function alternaVoz() {
+  VOZ.ligada = !VOZ.ligada;
+  localStorage.setItem('sm_voz', VOZ.ligada ? '1' : '0');
+  if (!VOZ.ligada) speechSynthesis.cancel();
+  else fala('Voz ligada', { forcar: true });
+  return VOZ.ligada;
+}
+
+/** Diz uma frase. `chave` evita repetir a mesma instrução. */
+export function fala(texto, { chave = null, forcar = false } = {}) {
+  if (!VOZ.ligada || !('speechSynthesis' in window)) return;
+  if (chave && VOZ.dito.has(chave) && !forcar) return;
+  if (chave) VOZ.dito.add(chave);
+
+  const f = new SpeechSynthesisUtterance(texto);
+  f.lang = 'pt-BR';
+  if (VOZ.escolhida) f.voice = VOZ.escolhida;
+  // um pouco mais devagar que o padrão: quem está com capacete e vento
+  // perde sílaba, e instrução pela metade é pior que instrução nenhuma
+  f.rate = 0.98;
+  f.pitch = 1.02;
+  f.volume = 1;
+  speechSynthesis.cancel();   // a instrução nova sempre manda mais que a velha
+  speechSynthesis.speak(f);
+}
+
+export function esqueceFalas() { VOZ.dito.clear(); }
+
+/**
+ * A frase da manobra, no tom de quem fala, não de quem escreve.
+ *
+ * "Em duzentos metros, vire à direita na Rua Sena Madureira" — a
+ * distância primeiro, porque é ela que diz se a pessoa precisa agir
+ * agora ou só ficar sabendo.
+ */
+export function fraseDaManobra(passo, distancia) {
+  const rua = passo.rua ? ` na ${passo.rua}` : '';
+  if (passo.icone === 'destino') return 'Você chegou ao destino.';
+  if (distancia > 500) return `Siga por ${Math.round(distancia / 100) * 100} metros.`;
+  if (distancia > 120) {
+    return `Em ${Math.round(distancia / 50) * 50} metros, ${minuscula(passo.texto)}${rua}.`;
+  }
+  return `${passo.texto}${rua}.`;
+}
+
+const minuscula = (t) => t.charAt(0).toLowerCase() + t.slice(1);

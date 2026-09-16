@@ -3,6 +3,7 @@ import { telaVisao } from './painel-visao.js';
 import { telaClientes } from './painel-crm.js';
 import { telaEstoque } from './painel-estoque.js';
 import { telaLoja } from './painel-loja.js';
+import { telaFrota } from './painel-frota.js';
 
 const API = location.origin;
 const $ = (s, r = document) => r.querySelector(s);
@@ -31,6 +32,8 @@ const S = {
   eanAberto: null, produtoAberto: null, lotes: [], kardex: [], ultimaEntrada: null,
   // a loja
   lojaDados: null, horarios: [], config: null,
+  // a frota
+  frota: [],
 };
 
 async function api(metodo, caminho, corpo) {
@@ -113,6 +116,7 @@ async function carregar() {
     }
   }
   if (S.aba === 'estoque') await carregaEstoque(pid, pega);
+  if (S.aba === 'frota') S.frota = await pega('/entregadores', []);
   if (S.aba === 'loja') {
     S.lojaDados = await pega('', null);
     S.horarios = S.lojaDados?.horarios ?? [];
@@ -170,6 +174,7 @@ function navegacao() {
     ]],
     ['gestão', [
       ['clientes', 'Clientes', 0, ''],
+      ['frota', 'Frota', 0, ''],
       ['estoque', 'Estoque', S.ind.estoque_zerado ?? 0, 'ret'],
       ['catalogo', 'Catálogo', 0, ''],
       ['ruptura', 'Ruptura e recall', 0, ''],
@@ -268,6 +273,7 @@ function painel() {
   if (S.aba === 'clientes') return telaClientes({ S });
   if (S.aba === 'estoque') return telaEstoque({ S });
   if (S.aba === 'loja') return telaLoja({ S });
+  if (S.aba === 'frota') return telaFrota({ S });
   if (S.aba === 'receitas') return telaReceitas();
   if (S.aba === 'retencao') return telaRetencao();
   if (S.aba === 'conversas') return telaConversas();
@@ -719,6 +725,35 @@ function telasNovas(a, b, base, pid) {
     const motivo = prompt('Motivo da baixa: vencido, quebra, avaria…');
     if (!motivo) return true;
     acao(() => api('POST', `${base}/estoque/perda`, { lote_id: lote, qtd: Number(quantos), motivo }));
+    return true;
+  }
+
+  if (a === 'salvar-piloto') {
+    const f = b.closest('.bloco-frota');
+    const v = (n) => f.querySelector(`[name="${n}"]`)?.value?.trim() ?? '';
+    const marcado = (n) => !!f.querySelector(`[name="${n}"]`)?.checked;
+    if (!v('nome')) { S.erro = 'O piloto precisa de nome'; desenhar(); return true; }
+    acao(() => api('POST', `${base}/entregadores`, {
+      nome: v('nome'), telefone: v('telefone'), veiculo: v('veiculo'),
+      placa: v('placa'), cnh: v('cnh'), email: v('email'), senha: v('senha') || 'entrega123',
+      caixa_termica: marcado('caixa_termica'), rastreavel: marcado('rastreavel'),
+    }));
+    return true;
+  }
+  if (a === 'rastreio' || a === 'piloto-ativo') {
+    const c = S.frota.find((x) => x.id === b.dataset.id);
+    if (!c) return true;
+    // desligar o rastreio é decisão da loja, e vale dizer em voz alta o
+    // que acontece: o cliente deixa de ver a moto naquele instante
+    if (a === 'rastreio' && c.rastreavel
+        && !confirm(`Desligar o rastreamento de ${c.nome}? O cliente deixa de ver a moto no mapa.`)) {
+      return true;
+    }
+    acao(() => api('POST', `${base}/entregadores`, {
+      ...c,
+      rastreavel: a === 'rastreio' ? !c.rastreavel : c.rastreavel,
+      ativo: a === 'piloto-ativo' ? !c.ativo : c.ativo,
+    }));
     return true;
   }
 

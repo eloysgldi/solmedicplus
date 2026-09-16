@@ -1,5 +1,6 @@
 import { criaNavegacao, rotaNavegavel, melhorOrdem, metros, rumo,
-         formataDistancia, formataTempo } from './navmapa.js';
+         formataDistancia, formataTempo, fala, falaLigada, alternaVoz,
+         esqueceFalas, fraseDaManobra } from './navmapa.js';
 
 /**
  * ============================================================
@@ -131,9 +132,13 @@ async function navegaAte(entrega) {
   const r = await rotaNavegavel(de, { lat: entrega.lat, lng: entrega.lng });
   if (!r) { aviso('Não consegui traçar a rota agora', true); return; }
   S.rota = r;
+  esqueceFalas();
   desenha();
   S.mapa?.poeRota(r.pontos, []);
   desenhaMapa();
+  fala(`Rota traçada. ${formataDistancia(r.metros)} até ${entrega.logradouro}, `
+    + `${entrega.numero ?? 'sem número'}. ${formataTempo(r.segundos)} de viagem.`,
+    { forcar: true });
 }
 
 /**
@@ -156,6 +161,15 @@ function atualizaManobra() {
     S.passoAtual++;
     vibra([40, 60, 40]);
   } else S.passoAtual = melhor;
+
+  // a voz avisa em tres tempos: longe, perto e na hora. Cada faixa fala
+  // uma vez so -- navegador que repete vira ruido, e ruido se desliga
+  const passo = S.rota.passos[S.passoAtual];
+  if (passo?.em) {
+    const d = metros(S.pos, passo.em);
+    const faixa = d > 500 ? null : d > 250 ? 'longe' : d > 90 ? 'perto' : 'agora';
+    if (faixa) fala(fraseDaManobra(passo, d), { chave: `${S.passoAtual}:${faixa}` });
+  }
 
   const el = $('#manobra');
   if (el) el.innerHTML = cartaoManobra();
@@ -215,8 +229,13 @@ function telaNavegando() {
     <div class="nav-mapa" id="navmapa"></div>
     <div class="nav-topo" id="manobra">${cartaoManobra()}</div>
 
-    <button class="nav-norte ${S.mapa?.seguindo ? '' : 'solto'}" data-acao="norte"
-      aria-label="Girar o mapa">${S.mapa?.seguindo ? '⬆' : 'N'}</button>
+    <div class="nav-botoes">
+      <button class="nav-bt ${falaLigada() ? 'on' : ''}" data-acao="voz"
+        aria-label="${falaLigada() ? 'Desligar a voz' : 'Ligar a voz'}">
+        ${falaLigada() ? '🔊' : '🔇'}</button>
+      <button class="nav-bt ${S.mapa?.seguindo ? '' : 'solto'}" data-acao="norte"
+        aria-label="Girar o mapa">${S.mapa?.seguindo ? '⬆' : 'N'}</button>
+    </div>
 
     <div class="nav-pe">
       <div class="nav-resumo">
@@ -450,6 +469,7 @@ document.addEventListener('click', async (ev) => {
     if (e) navegaAte(e);
     return;
   }
+  if (acao === 'voz') { alternaVoz(); desenha(); return; }
   if (acao === 'voltar-fila') { S.tela = 'fila'; S.navegando = null; desenha(); return; }
   if (acao === 'norte') {
     if (S.mapa?.seguindo) S.mapa.soltaNorte(); else { S.mapa?.voltaASeguir(); desenhaMapa(); }
