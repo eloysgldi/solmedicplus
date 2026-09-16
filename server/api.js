@@ -17,6 +17,7 @@ import * as armario from './armario.js';
 import * as estoque from './estoque.js';
 import * as crm from './crm.js';
 import * as fotos from './fotos.js';
+import * as entregas from './entregas.js';
 import { SINTOMAS, RESSALVA_SINTOMA, acha as achaSintoma } from './sintomas.js';
 import { chavesVapid } from './push.js';
 import { CONFIG, lojaDaCasa, filtroReceita, defineConfig, todasConfigs } from './config.js';
@@ -895,4 +896,75 @@ r.put('/api/comercio/:pid/area', async (req, res, p) => {
   const area = (b.area ?? []).map((s) => String(s).trim()).filter(Boolean);
   if (!area.length) throw new Erro(422, 'AREA_VAZIA', 'A loja precisa atender pelo menos um bairro');
   json(res, 200, defineConfig('area', area));
+});
+
+// ============================================================
+// APP DO ENTREGADOR
+// ============================================================
+
+/** Quem sou eu, que loja me contratou, e se estou rastreável. */
+r.get('/api/entregador/eu', (req, res) => {
+  const u = exigeLogin(req);
+  const c = entregas.meuCadastro(u.id);
+  if (!c) throw new Erro(403, 'NAO_E_ENTREGADOR', 'Sua conta não é de entregador');
+  json(res, 200, { ...c, usuario: { id: u.id, nome: u.nome, email: u.email } });
+});
+
+r.post('/api/entregador/turno', async (req, res) => {
+  const u = exigeLogin(req);
+  const c = entregas.meuCadastro(u.id);
+  if (!c) throw new Erro(403, 'NAO_E_ENTREGADOR', 'Sua conta não é de entregador');
+  const b = await corpo(req);
+  json(res, 200, entregas.turno(c.id, b.entrando !== false));
+});
+
+/** A fila: o que já é meu e o que está no balcão esperando alguém. */
+r.get('/api/entregador/fila', (req, res) => {
+  const u = exigeLogin(req);
+  const c = entregas.meuCadastro(u.id);
+  if (!c) throw new Erro(403, 'NAO_E_ENTREGADOR', 'Sua conta não é de entregador');
+  json(res, 200, { ...entregas.fila(c), loja: {
+    nome: c.nome_fantasia, lat: c.loja_lat, lng: c.loja_lng,
+    rua: c.loja_rua, numero: c.loja_numero } });
+});
+
+/**
+ * A batida de posição.
+ *
+ * Responde 200 mesmo quando descarta — o aparelho não precisa saber se a
+ * loja desligou o rastreamento para continuar funcionando, e devolver
+ * erro faria o app dele encher a tela de alerta inútil na rua.
+ */
+r.post('/api/entregador/posicao', async (req, res) => {
+  const u = exigeLogin(req);
+  const c = entregas.meuCadastro(u.id);
+  if (!c) throw new Erro(403, 'NAO_E_ENTREGADOR', 'Sua conta não é de entregador');
+  json(res, 200, entregas.registraPosicao(c.id, await corpo(req)));
+});
+
+/** Onde está a moto — lido pelo cliente que espera o pedido. */
+r.get('/api/pedidos/:id/entregador', (req, res, p) => {
+  const u = exigeLogin(req);
+  const o = um('SELECT user_id FROM orders WHERE id = ?', p.id);
+  if (!o || o.user_id !== u.id) throw new Erro(403, 'SEM_PERMISSAO', 'Esse pedido não é seu');
+  json(res, 200, entregas.posicaoDoPedido(p.id) ?? { rastreando: false });
+});
+
+// ---- frota, do lado da loja ----
+r.get('/api/comercio/:pid/entregadores', (req, res, p) => {
+  exigeLoja(req, p.pid);
+  json(res, 200, entregas.listaDaLoja(p.pid));
+});
+
+r.post('/api/comercio/:pid/entregadores', async (req, res, p) => {
+  exigeLoja(req, p.pid, ['gerente']);
+  const b = await corpo(req);
+  const criaConta = ({ nome, email, senha, telefone }) => {
+    const uid = id();
+    roda(`INSERT INTO users (id,nome,email,telefone,senha_hash,papel_global,socio,criado_em)
+          VALUES (?,?,?,?,?,'cliente',0,?)`,
+      uid, nome, email, telefone ?? null, hashSenha(senha || 'entrega123'), agora());
+    return uid;
+  };
+  json(res, 201, entregas.salvaEntregador(p.pid, b, criaConta));
 });

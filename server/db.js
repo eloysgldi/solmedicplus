@@ -437,3 +437,44 @@ export function transacao(fn) {
 /** Centavos -> "R$ 12,40". Só para log e e-mail; a API devolve centavos. */
 export const brl = (c) =>
   'R$ ' + (c / 100).toFixed(2).replace('.', ',');
+
+// ============================================================
+// O ENTREGADOR
+//
+// Quem cadastra o piloto, define o veículo e decide se a corrida é
+// rastreável é a loja — não o entregador. Rastreamento é dado de
+// localização de uma pessoa: quem assume essa responsabilidade é o
+// estabelecimento, que responde pelo vínculo.
+// ============================================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS entregador_posicoes (
+  id          TEXT PRIMARY KEY,
+  courier_id  TEXT NOT NULL REFERENCES couriers(id),
+  order_id    TEXT REFERENCES orders(id),
+  lat         REAL NOT NULL,
+  lng         REAL NOT NULL,
+  precisao_m  REAL,
+  velocidade  REAL,
+  rumo        REAL,
+  bateria     INTEGER,
+  criado_em   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pos_courier ON entregador_posicoes(courier_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_pos_order ON entregador_posicoes(order_id, criado_em);
+`);
+
+// colunas que nasceram com o app do entregador
+for (const [tabela, coluna, tipo] of [
+  // a loja liga e desliga o rastreamento por entregador
+  ['couriers', 'rastreavel', 'INTEGER NOT NULL DEFAULT 1'],
+  ['couriers', 'em_turno', 'INTEGER NOT NULL DEFAULT 0'],
+  ['couriers', 'ultima_lat', 'REAL'],
+  ['couriers', 'ultima_lng', 'REAL'],
+  ['couriers', 'ultima_em', 'TEXT'],
+  ['couriers', 'criado_em', 'TEXT'],
+  ['couriers', 'cnh', 'TEXT'],
+  ['couriers', 'observacao', 'TEXT'],
+]) {
+  const tem = db.prepare(`PRAGMA table_info(${tabela})`).all().some((c) => c.name === coluna);
+  if (!tem) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+}
