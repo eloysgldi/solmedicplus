@@ -56,7 +56,27 @@ export async function ligaAvisos(api) {
 
   try {
     const { chave } = await api('GET', '/api/push/chave');
-    const ja = await registro.pushManager.getSubscription();
+    let ja = await registro.pushManager.getSubscription();
+
+    /*
+     * A inscrição existente pode estar casada com uma chave VAPID antiga.
+     *
+     * Em hospedagem de disco efêmero o servidor gera par novo a cada
+     * deploy, e aí toda inscrição feita antes vira lixo: o aparelho
+     * continua "aceito", o serviço de push recusa em silêncio, e a
+     * pessoa conclui que o app parou de avisar. Comparar a chave e
+     * refazer a inscrição é o que faz isso se curar sozinho.
+     */
+    if (ja?.options?.applicationServerKey) {
+      const bytes = new Uint8Array(ja.options.applicationServerKey);
+      const usada = btoa(String.fromCharCode(...bytes))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      if (usada !== chave) {
+        await ja.unsubscribe().catch(() => {});
+        ja = null;
+      }
+    }
+
     const inscricao = ja ?? await registro.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: b64ParaBytes(chave),

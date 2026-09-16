@@ -35,6 +35,12 @@ export function chavesVapid() {
     };
   }
   const guardado = um("SELECT valor FROM configuracoes WHERE chave = 'vapid'");
+  if (!guardado && process.env.NODE_ENV === 'production') {
+    console.warn('\n  [push] gerando par VAPID novo.\n'
+      + '  Em disco efemero isso acontece a cada deploy e derruba todas as\n'
+      + '  inscricoes existentes. Rode "npm run vapid" e fixe SM_VAPID_PUB e\n'
+      + '  SM_VAPID_PRIV_PEM no painel da hospedagem.\n');
+  }
   if (guardado) return JSON.parse(guardado.valor);
 
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });

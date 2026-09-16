@@ -3,7 +3,7 @@
    Faz três coisas: instala o app na tela inicial, deixa o catálogo
    navegável sem rede, e recebe as notificações.
    ============================================================ */
-const VERSAO = 'solmedic-v3';
+const VERSAO = 'solmedic-v4';
 const CASCA = ['/', '/index.html', '/app.css', '/app.js', '/pkg.js',
                '/marca.js', '/mapa.js', '/marca.svg', '/manifest.json'];
 
@@ -19,22 +19,37 @@ self.addEventListener('activate', (e) => {
 
 /**
  * A API nunca vem do cache: preço, estoque e status de pedido errados são
- * pior que tela vazia. A casca vem do cache primeiro, para abrir instantâneo.
+ * pior que tela vazia.
+ *
+ * O resto era cache-primeiro, e isso tinha um defeito sério: uma vez que
+ * app.js entrava no cache, a pessoa recebia aquela versão para sempre.
+ * Subir correção no ar não mudava nada no aparelho de quem já tinha
+ * aberto o app — o pior tipo de bug, porque some quando você testa numa
+ * aba anônima.
+ *
+ * Agora é rede-primeiro com cache de reserva: online, sempre a versão
+ * nova; sem sinal, abre com a última que funcionou. Um app de farmácia
+ * precisa estar certo mais do que precisa abrir em 80 ms.
  */
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) return;
 
-  e.respondWith(
-    caches.match(e.request).then((achou) => {
-      const rede = fetch(e.request).then((r) => {
-        if (r.ok) caches.open(VERSAO).then((c) => c.put(e.request, r.clone()));
-        return r;
-      }).catch(() => achou);
-      return achou || rede;
-    })
-  );
+  e.respondWith((async () => {
+    try {
+      const r = await fetch(e.request);
+      if (r.ok) {
+        const copia = r.clone();
+        caches.open(VERSAO).then((c) => c.put(e.request, copia));
+      }
+      return r;
+    } catch {
+      // sem rede: devolve o que tiver guardado, de qualquer versão
+      const achou = await caches.match(e.request);
+      return achou ?? Response.error();
+    }
+  })());
 });
 
 /* ---------- notificações ---------- */
