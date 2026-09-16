@@ -968,3 +968,17 @@ r.post('/api/comercio/:pid/entregadores', async (req, res, p) => {
   };
   json(res, 201, entregas.salvaEntregador(p.pid, b, criaConta));
 });
+
+/** Apurar o ponto de um endereço que já existe — é o GPS corrigindo o CEP. */
+r.put('/api/enderecos/:id', async (req, res, p) => {
+  const u = exigeLogin(req);
+  const a = um('SELECT * FROM addresses WHERE id = ? AND user_id = ?', p.id, u.id);
+  if (!a) throw new Erro(404, 'ENDERECO_INEXISTENTE', 'Esse endereço não é seu');
+  const b = await corpo(req);
+  const lat = Number(b.lat), lng = Number(b.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Erro(422, 'COORDENADA_INVALIDA', 'Coordenada inválida');
+  }
+  roda('UPDATE addresses SET lat = ?, lng = ? WHERE id = ?', lat, lng, p.id);
+  json(res, 200, um('SELECT * FROM addresses WHERE id = ?', p.id));
+});

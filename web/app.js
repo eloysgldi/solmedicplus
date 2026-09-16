@@ -126,8 +126,7 @@ function telaInicio() {
   <div class="tela" id="tela"><div class="rolagem">
     <div class="capa">
       <div class="fila-marca">
-        <span class="marca-topo">${marca({ tam: 32 })}</span>
-        ${logotipo({ tam: 17 })}
+        ${logotipo({ tam: 20 })}
         <button class="redondo" data-ir="avisos" aria-label="Avisos">${IC.sino}
           ${S.naoLidas ? `<span class="selo">${S.naoLidas > 9 ? '9+' : S.naoLidas}</span>` : ''}</button>
         <button class="redondo" data-ir="carrinho" aria-label="Carrinho">${IC.carrinho}
@@ -152,6 +151,8 @@ function telaInicio() {
       <span class="sep">·</span><span>aberta agora</span>
       <span class="sep">·</span><span class="prazo-loja">chega em 40 min</span>
     </div>
+
+    ${cartaoLocalizacao(end)}
 
     <div class="secao"><h2>O que você está sentindo?</h2></div>
     <div class="trilho-sintomas escalona">
@@ -201,14 +202,14 @@ function telaInicio() {
         </span>
       </div>` : ''}
 
-    ${cats.length ? `
-      <div class="secao"><h2>Categorias</h2><span class="nota">${d.categorias.reduce((a, c) => a + c.n, 0)} itens</span></div>
-      <div class="grade-cat escalona">${cats.map((c) => {
-        const [nome, cor] = CATS[c.categoria];
-        return `<button class="cat" data-ir="busca?cat=${c.categoria}">
-          <span class="icone" style="background:${cor}1F;color:${cor}">${pictograma(c.categoria)}</span>
-          <span>${nome}</span></button>`;
-      }).join('')}</div>` : ''}
+    ${/*
+        A grade de categorias saiu daqui.
+        Oito quadradinhos ocupavam meia tela da home para dizer o que a
+        farmácia vende — informação que a pessoa já sabe. Quem chega na
+        home quer resolver um sintoma ou repetir uma compra; quem quer
+        navegar por prateleira está na busca, e é lá que a grade mora
+        agora, atrás de um botão.
+      */''}
 
     ${d.ofertas.length ? `
       <div class="secao"><h2>Ofertas de hoje</h2><span class="mais" data-ir="busca">ver tudo</span></div>
@@ -286,9 +287,16 @@ function telaBusca() {
       <button class="redondo" data-ir="carrinho" aria-label="Carrinho">${IC.carrinho}${totalItens() ? `<span class="selo">${totalItens()}</span>` : ''}</button>
     </div>
     <div class="filtros">
+      <button class="filtro-cat ${S.catsAbertas ? 'on' : ''}" data-cats="1">
+        <span class="pontinhos"><i></i><i></i><i></i><i></i></span>
+        Categorias
+      </button>
       ${FILTROS.map((f) => `<button class="filtro ${S.filtro === f.id ? 'on' : ''}"
         data-filtro="${f.id}">${f.rotulo}</button>`).join('')}
     </div>
+
+    ${S.catsAbertas ? gradeCategorias() : ''}
+
     <div id="resultados">${carregando ? Array.from({ length: 3 }, () =>
         '<div class="esqueleto" style="height:100px;margin:0 18px 10px;border-radius:18px"></div>').join('')
       : !q ? `
@@ -2041,7 +2049,7 @@ function ligaFormulario() {
 }
 
 fone.addEventListener('click', async (e) => {
-  const alvo = e.target.closest('[data-ir],[data-modo],[data-add],[data-qtd],[data-fechar],[data-enviar],[data-oferta],[data-cancelar],[data-filtro],[data-enderecos],[data-nota],[data-marca],[data-avaliar],[data-sair],[data-push],[data-detalhe],[data-instalar],[data-testar],[data-armario],[data-pergunta],[data-enviar-msg],[data-forma],[data-pix],[data-copiar],[data-sintoma]');
+  const alvo = e.target.closest('[data-ir],[data-modo],[data-cats],[data-gps],[data-add],[data-qtd],[data-fechar],[data-enviar],[data-oferta],[data-cancelar],[data-filtro],[data-enderecos],[data-nota],[data-marca],[data-avaliar],[data-sair],[data-push],[data-detalhe],[data-instalar],[data-testar],[data-armario],[data-pergunta],[data-enviar-msg],[data-forma],[data-pix],[data-copiar],[data-sintoma]');
   if (!alvo || alvo.closest('.folha')) return;
   const d = alvo.dataset;
 
@@ -2207,6 +2215,42 @@ fone.addEventListener('click', async (e) => {
     if (ok) sair();
     return;
   }
+  /**
+   * O convite de GPS na home.
+   *
+   * Se a pessoa já tem endereço, o que a localização faz é apurar o
+   * ponto — então ela fica onde está e o app só guarda a coordenada.
+   * Sem endereço, o GPS leva direto para o formulário já preenchido,
+   * que é o passo que faltava.
+   */
+  if (d.gps) {
+    e.preventDefault();
+    const temEndereco = (S.dados.enderecos ?? []).length > 0;
+    if (!temEndereco) { proximoModo = 'nada'; return vaiPara('endereco'); }
+    const botao = alvo;
+    botao.classList.add('ocupado');
+    try {
+      const pos = await new Promise((ok, nao) => navigator.geolocation.getCurrentPosition(ok, nao, {
+        enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }));
+      S.coord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const atual = (S.dados.enderecos ?? []).find((x) => x.id === S.enderecoId)
+        ?? S.dados.enderecos[0];
+      if (atual) {
+        await api('PUT', `/api/enderecos/${atual.id}`, S.coord).catch(() => {});
+        S.dados.enderecos = null;
+      }
+      localStorage.setItem('sm_gps_ok', '1');
+      aviso('Ponto de entrega apurado');
+      proximoModo = 'nada'; desenha();
+    } catch (err) {
+      botao.classList.remove('ocupado');
+      aviso(err?.code === 1
+        ? 'Sem permissão de localização — dá para editar o endereço na mão'
+        : 'Não consegui te localizar agora', { bom: false });
+    }
+    return;
+  }
+  if (d.cats) { e.preventDefault(); S.catsAbertas = !S.catsAbertas; proximoModo = 'nada'; return desenha(); }
   if (d.modo) {
     e.preventDefault();
     S.modoCadastro = d.modo === 'cadastro';
@@ -2441,3 +2485,70 @@ const COR_SINTOMA = {
   corte: '#1F9E7A', bebe: '#2E6BFF', imunidade: '#7A3BC7',
 };
 const corDoSintoma = (id, cat) => COR_SINTOMA[id] ?? (CATS[cat] ?? [])[1] ?? 'var(--brand)';
+
+/**
+ * A grade de categorias, na busca.
+ *
+ * Saiu da home porque lá ela respondia uma pergunta que ninguém faz
+ * ("o que a farmácia vende?"). Aqui responde a pergunta certa: a pessoa
+ * abriu a busca e não sabe o nome do que procura — então navega pela
+ * prateleira.
+ *
+ * Fica fechada por padrão: quem já sabe o que quer digita, e a grade
+ * aberta empurraria o resultado para fora da tela.
+ */
+function gradeCategorias() {
+  const cats = (S.inicio?.categorias ?? []).filter((c) => CATS[c.categoria]);
+  if (!cats.length) return '';
+  return `
+  <div class="gaveta-cat">
+    ${cats.map((c) => {
+      const [nome, cor] = CATS[c.categoria];
+      return `<button class="cat-larga" data-ir="busca?cat=${c.categoria}" style="--c:${cor}">
+        <span class="icone">${pictograma(c.categoria)}</span>
+        <span class="tx"><b>${nome}</b><span>${c.n} ${c.n === 1 ? 'item' : 'itens'}</span></span>
+        ${IC.seta}
+      </button>`;
+    }).join('')}
+  </div>`;
+}
+
+/**
+ * O convite para a localização, na home.
+ *
+ * O app nunca pedia — só perguntava lá dentro do cadastro de endereço,
+ * onde quem chega pela primeira vez não passa. E endereço digitado
+ * errado é a causa número um de entrega que não chega.
+ *
+ * Três formas, na ordem do quanto a pessoa já resolveu:
+ *
+ *   · não tem endereço → o cartão grande, que é o próximo passo dela;
+ *   · tem endereço mas nunca deu GPS → uma linha discreta oferecendo
+ *     apurar o ponto, porque o que ela tem já funciona;
+ *   · já deu → nada. Pedir de novo é ruído.
+ */
+function cartaoLocalizacao(end) {
+  if (S.coord || localStorage.getItem('sm_gps_ok')) return '';
+  if (!end) {
+    return `
+    <button class="convite-gps grande" data-gps="1">
+      <span class="anel-gps">
+        <span class="onda"></span><span class="onda d2"></span>
+        <span class="alfinete">${IC.local ?? ''}</span>
+      </span>
+      <span class="tx">
+        <b>Onde você está?</b>
+        <span>Deixa a gente achar sua rua — é um toque, e o entregador
+          para na porta certa.</span>
+      </span>
+      <span class="cta-gps">Usar minha localização</span>
+    </button>`;
+  }
+  return `
+  <button class="convite-gps fina" data-gps="1">
+    <span class="mini-alvo"></span>
+    <span class="tx"><b>Apurar o ponto da entrega</b>
+      <span>o GPS acerta o número e o complemento</span></span>
+    ${IC.seta}
+  </button>`;
+}

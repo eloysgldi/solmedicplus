@@ -1394,3 +1394,80 @@ a{color:inherit}
 .mapa-zoom .z-centro{opacity:0;pointer-events:none;transform:scale(.7)}
 .mapa.mexido .z-zoom,.mapa.mexido .mapa-zoom .z-centro{opacity:1;pointer-events:auto;transform:none}
 .mapa-zoom .z-centro{color:var(--brand)}
+
+/* ---------- categorias: agora na busca, atrás de um botão ---------- */
+.filtro-cat{
+  display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:100px;
+  background:var(--brand);color:#fff;font-size:13px;font-weight:700;white-space:nowrap;
+  box-shadow:0 6px 16px -8px rgba(17,56,180,.9);
+}
+.filtro-cat.on{background:var(--ink)}
+.pontinhos{display:grid;grid-template-columns:1fr 1fr;gap:2.5px;width:12px}
+.pontinhos i{width:4.5px;height:4.5px;border-radius:1.5px;background:currentColor}
+.gaveta-cat{
+  display:grid;gap:8px;padding:4px 18px 10px;
+  animation:gaveta .32s cubic-bezier(.32,.72,0,1) both;
+}
+@keyframes gaveta{from{opacity:0;transform:translateY(-8px)}}
+.cat-larga{
+  display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:var(--r2);
+  background:var(--surface);box-shadow:var(--s2);text-align:left;
+  border-left:3px solid var(--c);
+}
+.cat-larga:active{transform:scale(.985)}
+.cat-larga .icone{
+  width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:color-mix(in srgb, var(--c) 12%, transparent);color:var(--c);
+}
+.cat-larga .icone svg{width:20px;height:20px}
+.cat-larga .tx{flex:1;min-width:0}
+.cat-larga .tx b{display:block;font-size:14.5px;font-weight:700}
+.cat-larga .tx span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+
+/* ---------- convite de localização ---------- */
+.convite-gps{
+  display:flex;align-items:center;gap:14px;margin:14px 18px 0;padding:16px 16px;
+  width:calc(100% - 36px);text-align:left;border-radius:var(--r2);
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;
+  box-shadow:0 14px 30px -18px rgba(17,56,180,.95);
+  transition:transform .16s cubic-bezier(.2,.7,.3,1);
+}
+.convite-gps:active{transform:scale(.982)}
+.convite-gps.grande{flex-wrap:wrap}
+.convite-gps .tx{flex:1;min-width:150px}
+.convite-gps .tx b{display:block;font-family:var(--disp);font-size:17.5px;letter-spacing:-.02em;
+  font-variation-settings:"wdth" 106,"wght" 730}
+.convite-gps .tx span{display:block;font-size:12.8px;line-height:1.45;opacity:.9;margin-top:3px}
+.cta-gps{
+  width:100%;margin-top:4px;text-align:center;background:#fff;color:var(--brand);
+  padding:11px 16px;border-radius:12px;font-size:14px;font-weight:800;
+}
+
+/* o alfinete com as ondas: o desenho diz "estou te procurando" antes de
+   qualquer palavra, e é ele que faz o cartão não parecer mais um banner */
+.anel-gps{position:relative;width:52px;height:52px;flex:none;display:grid;place-items:center}
+.onda{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,.55);
+  animation:onda-gps 2.4s cubic-bezier(.2,.7,.3,1) infinite}
+.onda.d2{animation-delay:1.2s}
+@keyframes onda-gps{
+  0%{transform:scale(.45);opacity:0}
+  35%{opacity:.9}
+  100%{transform:scale(1);opacity:0}
+}
+.alfinete{width:22px;height:22px;border-radius:50%;background:#fff;position:relative;
+  box-shadow:0 2px 8px rgba(4,16,40,.4)}
+.alfinete::after{content:"";position:absolute;inset:0;margin:auto;width:8px;height:8px;
+  border-radius:50%;background:var(--brand)}
+.convite-gps.ocupado .onda{animation-duration:.9s}
+
+.convite-gps.fina{
+  background:var(--surface);color:var(--ink);box-shadow:var(--s2);padding:13px 15px;
+}
+.convite-gps.fina .tx b{font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0}
+.convite-gps.fina .tx span{color:var(--ink-3);opacity:1;font-size:11.5px}
+.mini-alvo{width:34px;height:34px;border-radius:50%;flex:none;background:var(--wash);
+  position:relative}
+.mini-alvo::before{content:"";position:absolute;inset:0;margin:auto;width:12px;height:12px;
+  border-radius:50%;border:2.5px solid var(--brand)}
+.mini-alvo::after{content:"";position:absolute;inset:0;margin:auto;width:2.5px;height:24px;
+  background:var(--brand);border-radius:2px;box-shadow:12px 0 0 -12px var(--brand)}
