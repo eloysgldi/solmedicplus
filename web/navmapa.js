@@ -238,30 +238,60 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
     y: (yDe(p.lat, zoom) - yDe(centro.lat, zoom)) * TELHA + alt / 2,
   });
 
-  /** As telhas ao redor do centro, com folga para o giro nao mostrar vazio. */
+  /**
+   * As telhas.
+   *
+   * O erro que deixava o mapa travado: isto reconstruía o innerHTML com
+   * 81 <img> a CADA batida de GPS — uma vez por segundo. O navegador
+   * jogava fora 81 imagens já decodificadas e pedia as mesmas de volta,
+   * e o resultado era um mapa que engasgava a cada passo da moto.
+   *
+   * Agora a grade só é reconstruída quando o centro muda de telha. Entre
+   * uma reconstrução e outra, a camada inteira anda com um translate —
+   * que o navegador resolve na GPU, sem tocar em DOM.
+   */
+  let telhaAtual = null;
+  // o centro em que o path da rota foi montado: enquanto ele valer, a
+  // rota so desliza junto com as telhas
+  let baseRota = null;
   function pintaTelhas() {
     if (!centro) return;
     const cx = xDe(centro.lng, zoom), cy = yDe(centro.lat, zoom);
     const max = Math.pow(2, zoom);
-    // o mapa gira: a diagonal e o que precisa estar coberto, nao a largura
-    // teto de 4: sem ele, tela grande em zoom alto pede 120 telhas de uma
+    // o mapa gira: a diagonal e o que precisa estar coberto, nao a largura.
+    // Teto de 4 porque tela grande em zoom alto pediria 120 telhas de uma
     // vez, e o servidor publico do OpenStreetMap corta -- o mapa fica preto
     const raio = Math.min(4, Math.ceil(Math.hypot(larg, alt) / TELHA / 2) + 1);
-    const x0 = Math.floor(cx) - raio, y0 = Math.floor(cy) - raio;
-    let html = '';
-    for (let i = 0; i <= raio * 2; i++) {
-      for (let j = 0; j <= raio * 2; j++) {
-        const tx = x0 + i, ty = y0 + j;
-        if (ty < 0 || ty >= max) continue;
-        const wrap = ((tx % max) + max) % max;
-        html += `<img src="${FONTE}/${zoom}/${wrap}/${ty}.png" alt="" decoding="async"
-          style="left:${((tx - cx) * TELHA + larg / 2).toFixed(1)}px;
-                 top:${((ty - cy) * TELHA + alt / 2).toFixed(1)}px">`;
+    const bx = Math.floor(cx), by = Math.floor(cy);
+
+    if (!telhaAtual || telhaAtual.x !== bx || telhaAtual.y !== by) {
+      telhaAtual = { x: bx, y: by, cx: bx, cy: by };
+      let html = '';
+      for (let i = -raio; i <= raio; i++) {
+        for (let j = -raio; j <= raio; j++) {
+          const tx = bx + i, ty = by + j;
+          if (ty < 0 || ty >= max) continue;
+          const wrap = ((tx % max) + max) % max;
+          html += `<img src="${FONTE}/${zoom}/${wrap}/${ty}.png" alt="" decoding="async"
+            style="left:${(i * TELHA).toFixed(0)}px;top:${(j * TELHA).toFixed(0)}px">`;
+        }
       }
+      telhas.innerHTML = html;
     }
-    telhas.innerHTML = html;
+    // o deslocamento fino fica no transform da camada: nada de DOM
+    telhas.style.transform =
+      `translate3d(${((telhaAtual.cx - cx) * TELHA + larg / 2).toFixed(1)}px,`
+      + `${((telhaAtual.cy - cy) * TELHA + alt / 2).toFixed(1)}px,0)`;
   }
 
+  /**
+   * A rota.
+   *
+   * Recalcular o path a cada batida de GPS era refazer conta para 100+
+   * pontos uma vez por segundo. Como a rota não muda enquanto a pessoa
+   * anda em cima dela, o path é montado uma vez em coordenada de telha e
+   * só o deslocamento entra depois — mesma ideia das telhas.
+   */
   function desenhaRota(andadoAte = 0) {
     if (!pontos.length || !centro) return;
     const d = pontos.map((p, i) => {
@@ -270,6 +300,8 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
     }).join(' ');
     rotaEl.setAttribute('d', d);
     sombraEl.setAttribute('d', d);
+    baseRota = { cx: xDe(centro.lng, zoom), cy: yDe(centro.lat, zoom) };
+    svg.style.transform = 'translate3d(0,0,0)';
     if (andadoAte > 0) {
       const ate = pontos.slice(0, Math.max(2, andadoAte)).map((p, i) => {
         const q = px(p);
@@ -301,9 +333,19 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
       // o piloto fica no terco de baixo: o que importa e o que vem pela frente
       palco.style.transform = `translate(var(--gx,0px), var(--gy,0px)) scale(var(--gz,1)) translateY(12%) rotate(${-giro}deg)`;
       pintaTelhas();
-      desenhaRota(andadoAte);
+      // a rota acompanha o mesmo deslocamento das telhas, em vez de ser
+      // recalculada ponto a ponto a cada segundo
+      const cx = xDe(centro.lng, zoom), cy = yDe(centro.lat, zoom);
+      if (!baseRota) desenhaRota(andadoAte);
+      else {
+        svg.style.transform =
+          `translate3d(${((baseRota.cx - cx) * TELHA).toFixed(1)}px,`
+          + `${((baseRota.cy - cy) * TELHA).toFixed(1)}px,0)`;
+      }
     },
-    poeRota(lista, listaParadas = []) { pontos = lista ?? []; paradas = listaParadas; desenhaRota(); },
+    poeRota(lista, listaParadas = []) {
+      pontos = lista ?? []; paradas = listaParadas; baseRota = null; desenhaRota();
+    },
     gestos: ligaGestosNav(container, palco,
       () => container.classList.add('mexido'),
       () => container.classList.remove('mexido')),

@@ -223,6 +223,28 @@ export function criaMapa(container, opcoes = {}) {
     enquadra,
 
     /**
+     * Espelha a rota do entregador.
+     *
+     * A linha do cliente deixa de ser "farmácia → casa" e passa a ser
+     * exatamente o caminho que o piloto está seguindo: mesma origem (onde
+     * ele está agora), mesmo destino, mesmo motor de rota. É o que
+     * transforma o mapa de ilustração em espelho.
+     */
+    poeRota(lista) {
+      if (!lista?.length) return;
+      const d = lista.map((pt, i) => {
+        const q = px(pt);
+        return (i ? 'L ' : 'M ') + q.x.toFixed(1) + ' ' + q.y.toFixed(1);
+      }).join(' ');
+      for (const el of [halo, base, rota]) el.setAttribute('d', d);
+      total = rota.getTotalLength();
+      rota.style.strokeDasharray = total;
+      // a rota nasce na moto: dali para a frente é tudo o que falta andar
+      rota.style.strokeDashoffset = 0;
+      atual = 0;
+    },
+
+    /**
      * A moto na posição REAL, vinda do GPS do entregador.
      *
      * Quando isto é chamado, o desenho para de fingir: a moto deixa de

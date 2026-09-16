@@ -227,3 +227,9 @@ input{font:inherit;color:inherit}
 /* só aparece quando a pessoa mexeu — antes disso não teria o que fazer */
 .nav-mapa.mexido ~ .voltar-rota,.nav-tela:has(.mexido) .voltar-rota{
   opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+
+/* a camada de telhas e a de rota andam por transform, na GPU: reconstruir
+   o DOM a cada batida de GPS era o que travava o mapa */
+.nav-telhas,.nav-svg{will-change:transform;transform:translate3d(0,0,0)}
+.nav-telhas img{contain:strict}
+.nav-palco{transition:transform .28s linear}

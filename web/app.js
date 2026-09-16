@@ -1,7 +1,7 @@
 import { qrSvg } from './qr.js';
 import { embalagem, pictograma, pictogramaSintoma, CATS, IC, ABA } from './pkg.js';
 import { marca, logotipo, sinal, abertura } from './marca.js';
-import { criaMapa, progressoDoStatus } from './mapa.js';
+import { criaMapa, progressoDoStatus, rotaDeRua } from './mapa.js';
 import * as avisos from './avisos.js';
 
 /* ============ estado ============ */
@@ -1382,7 +1382,18 @@ function montaRastreio() {
   const caixa = telaAtual?.querySelector('#mapa');
   if (!caixa) { mapaVivo?.destroi(); mapaVivo = null; return; }
   const p = S.dados.pedido;
-  const alvo = progressoDoStatus(p?.status);
+
+  /*
+   * A moto não anda antes de sair.
+   *
+   * O mapa animava a moto pelo trajeto assim que a tela abria, inclusive
+   * com o pedido ainda em separação — a pessoa via a entrega "a caminho"
+   * enquanto a caixa nem tinha saído do balcão. Agora: antes de despachar,
+   * a moto fica parada na porta da farmácia; depois disso, ela só se move
+   * com posição de GPS de verdade.
+   */
+  const saiu = p?.status === 'em_rota' || p?.status === 'entregue';
+  const alvo = p?.status === 'entregue' ? 1 : 0;
 
   if (!caixa.firstElementChild) {
     mapaVivo?.destroi();
@@ -1391,13 +1402,8 @@ function montaRastreio() {
       origem: p?.farmacia?.lat ? { lat: p.farmacia.lat, lng: p.farmacia.lng } : null,
       destino: p?.endereco?.lat ? { lat: p.endereco.lat, lng: p.endereco.lng } : null,
     });
-    // em rota, a moto continua andando devagar até chegar
-    // a moto só "anda sozinha" enquanto não existe posição de GPS. Assim
-    // que o entregador manda a primeira, a encenação para e o ponto passa
-    // a ser o real — rastreio que finge é pior que rastreio que falta
-    buscaMoto(p);
-    if (p?.status === 'em_rota') setTimeout(() => mapaVivo?.anima(0.92, 26000), 700);
-  } else if (mapaVivo) {
+    if (saiu) buscaMoto(p);
+  } else if (mapaVivo && !mapaVivo.aoVivo) {
     mapaVivo.anima(alvo, 1500);
   }
 
@@ -1535,7 +1541,7 @@ async function ligaCanalPessoal() {
   }, (m) => {
     // a moto andou de verdade. Se o pedido aberto na tela é esse, ela se
     // move na hora — sem esperar a próxima leitura da API
-    if (S.dados.pedido?.id === m.order_id && mapaVivo) mapaVivo.poeMoto(m);
+    if (S.dados.pedido?.id === m.order_id && mapaVivo) espelha(S.dados.pedido, m);
   });
 }
 
@@ -2572,9 +2578,42 @@ function cartaoLocalizacao(end) {
 async function buscaMoto(p) {
   if (!p?.id || p.status !== 'em_rota') return;
   const r = await api('GET', `/api/pedidos/${p.id}/entregador`).catch(() => null);
-  if (r?.lat && mapaVivo) {
-    mapaVivo.poeMoto(r);
-    const tira = telaAtual?.querySelector('#selo-rastreio');
-    if (tira) tira.textContent = 'ao vivo';
+  if (r?.lat && mapaVivo) espelha(p, r);
+}
+
+/**
+ * Espelha no cliente o que o piloto está vendo.
+ *
+ * Não basta mover o ponto: a linha também tem que ser a dele. Enquanto a
+ * rota era "farmácia → casa" fixa, a moto andava por fora do traçado
+ * assim que ele pegava outro caminho — e ninguém acredita num mapa em
+ * que a moto anda fora da linha.
+ *
+ * A rota é recalculada de onde ele está até o endereço, com o mesmo
+ * motor que o app dele usa. Só quando ele andou o bastante para valer:
+ * refazer a cada metro seria pedir ao roteador uma vez por segundo para
+ * desenhar quase a mesma linha.
+ */
+let ultimoEspelho = null;
+async function espelha(p, moto) {
+  if (!mapaVivo) return;
+  mapaVivo.poeMoto(moto);
+
+  const destino = p?.endereco?.lat ? { lat: p.endereco.lat, lng: p.endereco.lng } : null;
+  if (!destino) return;
+  const longe = !ultimoEspelho
+    || Math.hypot(moto.lat - ultimoEspelho.lat, moto.lng - ultimoEspelho.lng) > 0.0012;
+  if (!longe) return;
+  ultimoEspelho = { lat: moto.lat, lng: moto.lng };
+
+  const r = await rotaDeRua(moto, destino);
+  if (r?.pontos?.length && mapaVivo) {
+    mapaVivo.poeRota(r.pontos);
+    mapaVivo.poeMoto(moto);
+    const el = telaAtual?.querySelector('.mapa-credito .trecho');
+    if (el) {
+      const km = (r.metros / 1000).toFixed(1).replace('.', ',');
+      el.textContent = `${km} km · ${Math.round(r.segundos / 60)} min até você`;
+    }
   }
 }
