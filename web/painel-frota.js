@@ -1,4 +1,4 @@
-﻿import { esc } from './painel-ui.js';
+import { esc } from './painel-ui.js';
 /**
  * ============================================================
  * A FROTA
@@ -63,6 +63,28 @@ export function telaFrota({ S }) {
       Sem e-mail, ele fica cadastrado mas não consegue usar o app.
     </p>
   </div>
+
+  ${(S.posicoes ?? []).length ? `
+    <div class="card">
+      <header><div><div class="cod">agora na rua</div>
+        <div class="nm">Onde está cada moto</div></div>
+        <span class="pill" style="background:var(--save-bg);color:var(--save)">ao vivo</span></header>
+      ${S.posicoes.map((c) => `
+        <div class="linha-risco">
+          <span class="tj" style="background:var(--save)"></span>
+          <span class="quem"><b>${esc(c.nome)}</b>
+            <span>${esc(VEICULO_ROT[c.veiculo] ?? c.veiculo)}${c.placa ? ` · ${esc(c.placa)}` : ''}
+              ${c.levando ? ` · levando ${esc(c.levando)}` : ' · livre'}</span></span>
+          <a class="btn g sm" target="_blank" rel="noopener"
+             href="https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lng}#map=17/${c.lat}/${c.lng}">
+            ver no mapa</a>
+        </div>`).join('')}
+      <p class="fino" style="padding:10px 16px 14px">
+        Só aparece quem está em turno e com rastreamento ligado. Fora do turno
+        a última posição é apagada — a loja não acompanha ninguém depois do
+        expediente.
+      </p>
+    </div>` : ''}
 
   ${lista.length ? `
     <div class="card"><table>

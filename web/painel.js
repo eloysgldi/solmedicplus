@@ -33,7 +33,7 @@ const S = {
   // a loja
   lojaDados: null, horarios: [], config: null,
   // a frota
-  frota: [],
+  frota: [], posicoes: [], alertas: null,
 };
 
 async function api(metodo, caminho, corpo) {
@@ -101,7 +101,10 @@ async function carregar() {
     S.retencoes = await pega('/receitas/retencao', []);
     S.conversas = await pega('/conversas', []);
   }
-  if (S.aba === 'visao') S.visao = await pega('/visao', null);
+  if (S.aba === 'visao') {
+    S.visao = await pega('/visao', null);
+    S.alertas = await pega('/alertas', null);
+  }
   if ((S.aba === 'receitas' || S.aba === 'ruptura') && !S.catalogo.length) {
     S.catalogo = await pega('/catalogo', []);
   }
@@ -119,7 +122,10 @@ async function carregar() {
     }
   }
   if (S.aba === 'estoque') await carregaEstoque(pid, pega);
-  if (S.aba === 'frota') S.frota = await pega('/entregadores', []);
+  if (S.aba === 'frota') {
+    S.frota = await pega('/entregadores', []);
+    S.posicoes = await pega('/frota/posicoes', []);
+  }
   if (S.aba === 'loja') {
     S.lojaDados = await pega('', null);
     S.horarios = S.lojaDados?.horarios ?? [];

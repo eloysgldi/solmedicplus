@@ -21,6 +21,12 @@ export function telaVisao({ S }) {
     v.estoque?.vencendo_90d ? ['morno', `${v.estoque.vencendo_90d} lote(s) vencendo em 90 dias`, 'estoque'] : null,
     v.estoque?.divergentes ? ['morno', `${v.estoque.divergentes} divergência(s) entre saldo e lotes`, 'estoque'] : null,
     v.recompras?.length ? ['morno', `${v.recompras.length} cliente(s) passaram do próprio ritmo de recompra`, 'clientes'] : null,
+    // a falha silenciosa mais cara da casa: caixa pronta no balcão e
+    // ninguém na rua. Só se descobre quando o cliente liga reclamando
+    S.alertas?.sem_entregador
+      ? ['quente', `${S.alertas.prontos} pedido(s) prontos e nenhum entregador em turno`, 'frota'] : null,
+    S.alertas?.parados_ha_20min?.length
+      ? ['quente', `${S.alertas.parados_ha_20min.length} pedido(s) parados no balcão há mais de 20 min`, 'pedidos'] : null,
   ].filter(Boolean);
 
   return `

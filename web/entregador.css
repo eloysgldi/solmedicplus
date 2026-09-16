@@ -132,15 +132,14 @@ input{font:inherit;color:inherit}
 .nav-tela{position:fixed;inset:0;overflow:hidden;background:var(--fundo)}
 .nav-mapa{position:absolute;inset:0;overflow:hidden}
 .nav-palco{position:absolute;inset:-26%;transform-origin:50% 50%;
-  transition:transform .55s cubic-bezier(.32,.72,0,1);will-change:transform}
+  transition:transform .12s linear;will-change:transform}
 .nav-telhas{position:absolute;inset:0}
-.nav-telhas img{
-  position:absolute;width:256px;height:256px;display:block;
-  /* o tema noturno sai da própria telha clara: inverter, girar o matiz e
-     escurecer dá um mapa escuro legível sem depender de um segundo
-     servidor de telha só para ter modo noite */
-  filter:invert(1) hue-rotate(190deg) saturate(.55) brightness(.82) contrast(1.1);
+/* o filtro fica AQUI, na camada — não em cada imagem. Um filtro sobre a
+   camada composta em vez de 81 filtros repintados a cada quadro do giro */
+.nav-telhas{
+  filter:invert(1) hue-rotate(190deg) saturate(.5) brightness(.86) contrast(1.06);
 }
+.nav-telhas img{position:absolute;width:256px;height:256px;display:block}
 .nav-svg{position:absolute;inset:0}
 .nav-rota{opacity:.95}
 .nav-andado{opacity:.75}
@@ -232,4 +231,4 @@ input{font:inherit;color:inherit}
    o DOM a cada batida de GPS era o que travava o mapa */
 .nav-telhas,.nav-svg{will-change:transform;transform:translate3d(0,0,0)}
 .nav-telhas img{contain:strict}
-.nav-palco{transition:transform .28s linear}
+.nav-palco{transition:transform .12s linear}

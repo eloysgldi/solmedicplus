@@ -20,6 +20,20 @@
    ============================================================ */
 
 const TELHA = 256;
+/*
+ * Telha do OpenStreetMap, escurecida na CAMADA — não em cada imagem.
+ *
+ * Aqui estava a causa do travamento: o filtro escuro era aplicado em
+ * cada uma das 81 imagens (`.nav-telhas img { filter: ... }`). Como o
+ * mapa gira, o navegador refazia 81 filtros a cada quadro.
+ *
+ * Aplicado no contêiner, o filtro roda uma vez sobre a camada já
+ * composta, e o giro passa a ser só transform — que a GPU faz de graça.
+ * Mesmo desenho, uma fração do custo.
+ *
+ * (Tentei telha escura pronta do CARTO, que seria melhor ainda: hoje
+ * pede chave de API. Fica como troca de uma linha quando houver uma.)
+ */
 const FONTE = 'https://tile.openstreetmap.org';
 const OSRM = 'https://router.project-osrm.org/route/v1/driving';
 
@@ -250,6 +264,9 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
    * uma reconstrução e outra, a camada inteira anda com um translate —
    * que o navegador resolve na GPU, sem tocar em DOM.
    */
+  // telha em dobro de resolucao onde a tela merece: o texto da rua fica
+  // legivel em vez de borrado, e o custo e o mesmo numero de imagens
+  const retina = (window.devicePixelRatio || 1) > 1.4 ? '@2x' : '';
   let telhaAtual = null;
   // o centro em que o path da rota foi montado: enquanto ele valer, a
   // rota so desliza junto com as telhas
@@ -539,4 +556,73 @@ function ligaGestosNav(container, palco, aoMexer, aoSoltar) {
     },
     get mexido() { return escala !== 1 || !!dx || !!dy; },
   };
+}
+
+/* ============================================================
+   BÚSSOLA
+
+   O rumo do GPS só existe em movimento: parado no semáforo, ele fica
+   girando sozinho ou some. Quem está com o celular no suporte quer que o
+   mapa acompanhe para onde a MOTO está apontada — e isso é a bússola do
+   aparelho, não o GPS.
+
+   Então as duas fontes se dividem o trabalho:
+
+     · andando (acima de ~5 km/h): manda o rumo do GPS, que é estável e
+       segue a via;
+     · parado ou devagar: manda a bússola, que é a única que sabe para
+       onde o guidão está virado.
+
+   No iPhone a leitura vem em `webkitCompassHeading` e já é absoluta. No
+   Android vem em `alpha`, que conta ao contrário e precisa do evento
+   absoluto para valer como norte verdadeiro.
+   ============================================================ */
+
+let bussolaAtual = null;
+let bussolaLigada = false;
+
+export function rumoDaBussola() { return bussolaAtual; }
+
+export async function ligaBussola() {
+  if (bussolaLigada) return true;
+
+  // no iPhone a permissão tem que ser pedida dentro de um toque
+  const pedir = window.DeviceOrientationEvent?.requestPermission;
+  if (typeof pedir === 'function') {
+    try {
+      if (await DeviceOrientationEvent.requestPermission() !== 'granted') return false;
+    } catch { return false; }
+  }
+
+  const leitura = (e) => {
+    if (typeof e.webkitCompassHeading === 'number') {
+      bussolaAtual = e.webkitCompassHeading;           // iOS: já é o norte
+    } else if (e.absolute && typeof e.alpha === 'number') {
+      bussolaAtual = (360 - e.alpha) % 360;            // Android: conta ao contrário
+    }
+  };
+  window.addEventListener('deviceorientationabsolute', leitura, { passive: true });
+  window.addEventListener('deviceorientation', leitura, { passive: true });
+  bussolaLigada = true;
+  return true;
+}
+
+/**
+ * O rumo que vale agora.
+ *
+ * Suavizado: bússola de celular treme uns graus o tempo todo, e mapa que
+ * treme junto dá enjoo. O filtro puxa 25% na direção da leitura nova a
+ * cada quadro, e trata a volta pelo 360 para não girar o caminho longo.
+ */
+let rumoSuave = null;
+export function rumoParaOMapa(rumoGps, velocidade) {
+  const bruto = (velocidade > 1.5 && rumoGps !== null && !Number.isNaN(rumoGps))
+    ? rumoGps
+    : (bussolaAtual ?? rumoGps);
+  if (bruto === null || bruto === undefined || Number.isNaN(bruto)) return rumoSuave ?? 0;
+  if (rumoSuave === null) { rumoSuave = bruto; return rumoSuave; }
+
+  let delta = ((bruto - rumoSuave + 540) % 360) - 180;
+  rumoSuave = (rumoSuave + delta * 0.25 + 360) % 360;
+  return rumoSuave;
 }

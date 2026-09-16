@@ -150,6 +150,21 @@ export async function paraLoja(pharmacyId, tipo, dados = {}) {
       titulo: 'Via de receita a arquivar',
       corpo: `${dados.quantas ?? 1} receita(s) de papel voltaram e precisam de registro`,
     },
+    // a loja precisa saber o que o entregador fez, sem ter que perguntar
+    corrida_aceita: {
+      titulo: 'Entregador pegou a corrida',
+      corpo: `${dados.entregador ?? 'Alguém'} saiu com o pedido ${dados.codigo ?? ''}`,
+    },
+    entrega_concluida: {
+      titulo: `Pedido ${dados.codigo ?? ''} entregue`,
+      corpo: `${dados.entregador ?? 'O entregador'} entregou a ${dados.recebedor ?? 'quem estava'}`
+        + `${dados.minutos ? ` · ${dados.minutos} min de rota` : ''}`,
+    },
+    turno_vazio: {
+      titulo: 'Nenhum entregador em turno',
+      corpo: `${dados.prontos ?? 1} pedido(s) prontos no balcão e ninguém na rua`,
+      insistente: true,
+    },
     estoque_acabando: {
       titulo: 'Estoque acabando',
       corpo: `${dados.produto ?? ''} deve zerar em ${dados.dias ?? 2} dias no ritmo atual`,
@@ -166,7 +181,27 @@ export async function paraLoja(pharmacyId, tipo, dados = {}) {
   publica(`loja:${pharmacyId}`, { tipo: 'aviso', aviso: { ...molde, chave: tipo } });
   const equipe = todos(
     `SELECT user_id FROM pharmacy_users WHERE pharmacy_id = ? AND ativo = 1`, pharmacyId);
+  /*
+   * O aviso da loja também vira registro.
+   *
+   * Antes isto era só push: se o aparelho do gerente não tinha aceitado
+   * notificação — ou se a chave VAPID tinha mudado — o recado sumia sem
+   * deixar rastro, e a loja não tinha onde ver o que aconteceu enquanto
+   * ninguém olhava a tela.
+   *
+   * Agora grava, publica e empurra. Três caminhos, e o histórico não
+   * depende de nenhum deles ter funcionado.
+   */
   for (const m of equipe) {
+    const nid = id();
+    roda(`INSERT INTO notificacoes (id,user_id,tipo,titulo,corpo,url,order_id,criado_em)
+          VALUES (?,?,?,?,?,?,?,?)`,
+      nid, m.user_id, tipo, molde.titulo, molde.corpo ?? '', '/painel.html',
+      dados.order_id ?? null, agora());
+    publica(`user:${m.user_id}`, {
+      tipo: 'notificacao',
+      notificacao: { id: nid, titulo: molde.titulo, corpo: molde.corpo, url: '/painel.html' },
+    });
     await empurra(m.user_id, { ...molde, url: '/painel.html', tag: tipo });
   }
 }

@@ -982,3 +982,45 @@ r.put('/api/enderecos/:id', async (req, res, p) => {
   roda('UPDATE addresses SET lat = ?, lng = ? WHERE id = ?', lat, lng, p.id);
   json(res, 200, um('SELECT * FROM addresses WHERE id = ?', p.id));
 });
+
+/** Onde está cada moto da frota agora — é o que o painel desenha no mapa. */
+r.get('/api/comercio/:pid/frota/posicoes', (req, res, p) => {
+  exigeLoja(req, p.pid);
+  json(res, 200, todos(
+    `SELECT c.id, c.nome, c.veiculo, c.placa, c.ultima_lat AS lat, c.ultima_lng AS lng,
+            c.ultima_em,
+            (SELECT o.codigo FROM deliveries d JOIN orders o ON o.id = d.order_id
+              WHERE d.courier_id = c.id AND o.status = 'em_rota' LIMIT 1) AS levando,
+            (SELECT COUNT(*) FROM deliveries d JOIN orders o ON o.id = d.order_id
+              WHERE d.courier_id = c.id AND o.status = 'em_rota') AS em_rota
+       FROM couriers c
+      WHERE c.pharmacy_id = ? AND c.ativo = 1 AND c.em_turno = 1
+        AND c.rastreavel = 1 AND c.ultima_lat IS NOT NULL`, p.pid));
+});
+
+/**
+ * O alerta que faltava para fechar o ciclo da operação.
+ *
+ * Pedido pronto no balcão e ninguém em turno é a falha silenciosa mais
+ * cara da casa: o cliente espera, a loja acha que despachou, e só se
+ * descobre quando ele liga reclamando. A varredura roda junto com a
+ * consulta da fila, que o painel faz de qualquer jeito.
+ */
+r.get('/api/comercio/:pid/alertas', (req, res, p) => {
+  exigeLoja(req, p.pid);
+  const prontos = um(
+    `SELECT COUNT(*) AS n FROM orders WHERE pharmacy_id = ? AND status = 'pronto'`, p.pid).n;
+  const emTurno = um(
+    `SELECT COUNT(*) AS n FROM couriers WHERE pharmacy_id = ? AND ativo = 1 AND em_turno = 1`,
+    p.pid).n;
+  const parados = todos(
+    `SELECT codigo, separado_em FROM orders
+      WHERE pharmacy_id = ? AND status = 'pronto'
+        AND separado_em <= datetime('now','-20 minutes')`, p.pid);
+
+  json(res, 200, {
+    prontos, entregadores_em_turno: emTurno,
+    sem_entregador: prontos > 0 && emTurno === 0,
+    parados_ha_20min: parados,
+  });
+});

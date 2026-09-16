@@ -1,6 +1,6 @@
 import { criaNavegacao, rotaNavegavel, melhorOrdem, metros, rumo,
          formataDistancia, formataTempo, fala, falaLigada, alternaVoz,
-         esqueceFalas, fraseDaManobra } from './navmapa.js';
+         esqueceFalas, fraseDaManobra, ligaBussola, rumoParaOMapa } from './navmapa.js';
 
 /**
  * ============================================================
@@ -74,15 +74,21 @@ function ligaGps() {
     return aviso('A localização exige conexão segura (https)', true);
   }
   if (S.vigia !== null) return;
+  // a bussola precisa do toque para pedir permissao no iPhone; e este
+  // botao e sempre consequencia de um toque
+  ligaBussola();
 
   let ultimoEnvio = 0, ultimoPonto = null;
   S.vigia = navigator.geolocation.watchPosition((p) => {
     const nova = { lat: p.coords.latitude, lng: p.coords.longitude };
     const antes = S.pos;
     S.pos = nova;
-    // o rumo do GPS so e confiavel em movimento; parado ele gira sozinho
-    if (p.coords.heading !== null && p.coords.speed > 1.2) S.rumoAtual = p.coords.heading;
-    else if (antes && metros(antes, nova) > 6) S.rumoAtual = rumo(antes, nova);
+    // quem decide o rumo agora e a dupla GPS + bussola: andando manda o
+    // GPS, parado manda a bussola, e o resultado sai suavizado
+    const doGps = (p.coords.heading !== null && p.coords.speed > 1.2)
+      ? p.coords.heading
+      : (antes && metros(antes, nova) > 6 ? rumo(antes, nova) : null);
+    S.rumoAtual = rumoParaOMapa(doGps, p.coords.speed ?? 0);
 
     desenhaMapa();
     atualizaManobra();
@@ -183,6 +189,29 @@ function atualizaManobra() {
 function desenhaMapa() {
   if (!S.mapa || !S.pos) return;
   S.mapa.vai(S.pos, { rumoGraus: S.rumoAtual });
+}
+
+/**
+ * O giro acompanha o aparelho, não a chegada do GPS.
+ *
+ * Parado no semáforo o GPS não manda nada novo, e o mapa ficava congelado
+ * numa direção enquanto a pessoa virava o guidão. Este laço roda só
+ * enquanto a tela de navegação está aberta, lê a bússola e gira — e sai
+ * de cena assim que a pessoa volta para a fila.
+ */
+let laçoGiro = null;
+function ligaGiro() {
+  cancelAnimationFrame(laçoGiro);
+  const passo = () => {
+    if (S.tela !== 'navegando' || !S.mapa) { laçoGiro = null; return; }
+    const novo = rumoParaOMapa(null, 0);
+    if (S.pos && Math.abs(((novo - S.rumoAtual + 540) % 360) - 180) > 0.6) {
+      S.rumoAtual = novo;
+      S.mapa.vai(S.pos, { rumoGraus: novo });
+    }
+    laçoGiro = requestAnimationFrame(passo);
+  };
+  laçoGiro = requestAnimationFrame(passo);
 }
 
 /* ============ telas ============ */
@@ -401,6 +430,7 @@ function desenha() {
     if (caixa && !caixa.dataset.pronto) {
       caixa.dataset.pronto = '1';
       S.mapa = criaNavegacao(caixa);
+      ligaGiro();
       if (S.rota) S.mapa.poeRota(S.rota.pontos, []);
       desenhaMapa();
     }

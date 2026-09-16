@@ -387,6 +387,10 @@ export function despacha(orderId, courierId, ator) {
     escolhido, agora(), agora(), d.id);
   transiciona(orderId, 'em_rota', ator);
   const p = detalhe(orderId);
+  // a loja fica sabendo que a caixa saiu, e com quem — sem perguntar
+  solta(avisa.paraLoja(o.pharmacy_id, 'corrida_aceita', {
+    codigo: p.codigo, entregador: p.entregador?.nome ?? 'Entregador',
+  }));
   solta(avisa.paraCliente(p.user_id, 'saiu', p, {
     itens: nomesDosItens(orderId), entregador: p.entregador?.nome,
     eta: new Date(Date.now() + 14 * 60000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -430,6 +434,16 @@ export function entrega(orderId, { recebidoPor, doc, fotoUrl, receitaColetada = 
   transiciona(orderId, 'entregue', ator);
   // o que saiu da loja entra no armário de quem recebeu, com lote e validade
   armario.guardaEntrega(orderId);
+
+  // e o balcão fecha o ciclo: quem levou, para quem entregou, em quanto tempo
+  solta(avisa.paraLoja(o.pharmacy_id, 'entrega_concluida', {
+    codigo: o.codigo,
+    recebedor: recebidoPor ?? 'quem estava',
+    entregador: um(`SELECT c.nome FROM deliveries d JOIN couriers c ON c.id = d.courier_id
+                     WHERE d.order_id = ?`, orderId)?.nome,
+    minutos: o.despachado_em
+      ? Math.round((Date.now() - Date.parse(o.despachado_em)) / 60000) : null,
+  }));
   solta(avisa.paraCliente(o.user_id, 'entregue', o));
   return detalhe(orderId);
 }
