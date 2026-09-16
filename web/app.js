@@ -145,6 +145,8 @@ function telaInicio() {
       <span class="sep">·</span><span class="prazo-loja">chega em 40 min</span>
     </div>
 
+    ${capas()}
+
     <div class="secao"><h2>O que você está sentindo?</h2></div>
     <div class="trilho-sintomas escalona">
       ${(S.dados.sintomas ?? []).slice(0, 8).map((sm) => {
@@ -206,20 +208,7 @@ function telaInicio() {
       <div class="secao"><h2>Ofertas de hoje</h2><span class="mais" data-ir="busca">ver tudo</span></div>
       <div class="trilho escalona">${d.ofertas.map(cardProduto).join('')}</div>` : ''}
 
-    <div class="secao"><h2>Quem atende você</h2></div>
-    <button class="cartao-rt" data-ir="conversa">
-      <span class="topo-rt">
-        <span class="retrato-rt">${esc(iniciais(S.dados.vitrine?.responsavel_tecnico?.nome ?? 'Farmácia'))}</span>
-        <span class="quem-rt">
-          <b>${esc(S.dados.vitrine?.responsavel_tecnico?.nome ?? 'Farmacêutico responsável')}</b>
-          <span>${esc(S.dados.vitrine?.responsavel_tecnico?.crf ?? '')} · responsável técnica</span>
-        </span>
-        <span class="online"><i></i> online</span>
-      </span>
-      <span class="fala-rt">Dúvida de dose, se pode tomar junto, qual genérico serve.
-        Pergunte que eu respondo — é o meu trabalho.</span>
-      <span class="cta-rt">${IC.balao} Perguntar agora</span>
-    </button>
+    ${barraFarmaceutico()}
 
     ${d.recomprar.length ? `
       <div class="secao" style="margin-top:22px"><h2>Você já comprou</h2></div>
@@ -1162,6 +1151,12 @@ function telaEndereco() {
       em ${area.join(', ') || 'alguns bairros'}.</p>
     ${S.erro ? `<div class="erro-caixa" style="margin:0 18px 14px">${esc(S.erro)}</div>` : ''}
 
+    <button class="usar-gps" id="gps" type="button">
+      <span class="ic-gps"></span>
+      <span class="tx"><b>Usar minha localização</b>
+        <span>preenche rua e bairro pelo GPS do aparelho</span></span>
+    </button>
+
     <form id="fendereco" class="form-endereco">
       <label class="campo-rot"><span>Apelido</span>
         <input id="apelido" placeholder="Casa, trabalho…" value="Casa"></label>
@@ -1975,6 +1970,14 @@ function ligaFormulario() {
     });
   }
 
+  ligaCarteira();
+
+  const bgps = palco.querySelector('#gps');
+  if (bgps && !bgps.dataset.ligado) {
+    bgps.dataset.ligado = '1';
+    bgps.addEventListener('click', () => pegaLocalizacao(bgps));
+  }
+
   const fend = palco.querySelector('#fendereco');
   if (fend && !fend.dataset.ligado) {
     fend.dataset.ligado = '1';
@@ -1993,6 +1996,9 @@ function ligaFormulario() {
           complemento: val('complemento'), bairro: val('bairro'),
           cidade: val('cidade') || 'Fortaleza', uf: (val('uf') || 'CE').toUpperCase(),
           cep: val('cep'), padrao: 1,
+          // se o GPS falou, a coordenada dele manda: o mapa da entrega
+          // vira o ponto exato em vez do centro do bairro
+          lat: S.coord?.lat ?? null, lng: S.coord?.lng ?? null,
         });
         S.dados.enderecos = null;
         S.enderecoId = novo.id;
@@ -2336,4 +2342,198 @@ function avisosLegais(p) {
     });
   }
   return avisos;
+}
+
+/**
+ * Pegar o endereço pelo GPS.
+ *
+ * É o atalho que faz diferença de verdade no cadastro: digitar rua,
+ * número e bairro no celular, com pressa, é onde a maioria desiste.
+ *
+ * Três cuidados que a tela precisa ter e quase ninguém tem:
+ *
+ *   · o navegador só entrega a posição em HTTPS (localhost é exceção).
+ *     Em HTTP o botão não some — ele explica;
+ *   · a pessoa pode negar, e negar é uma resposta legítima: o formulário
+ *     continua lá, preenchível na mão;
+ *   · o endereço volta do Nominatim, serviço público do OpenStreetMap.
+ *     Se ele falhar, as coordenadas já valem — a entrega chega no ponto
+ *     certo mesmo com o nome da rua em branco.
+ */
+async function pegaLocalizacao(botao) {
+  if (!navigator.geolocation) {
+    return aviso('Este aparelho não informa a localização', { bom: false });
+  }
+  if (!window.isSecureContext) {
+    return aviso('A localização só funciona em conexão segura (https)', { bom: false });
+  }
+  botao.classList.add('ocupado');
+  botao.querySelector('b').textContent = 'Procurando você…';
+
+  try {
+    const pos = await new Promise((ok, nao) => navigator.geolocation.getCurrentPosition(ok, nao, {
+      enableHighAccuracy: true, timeout: 12000, maximumAge: 60000,
+    }));
+    const { latitude: lat, longitude: lng } = pos.coords;
+    S.coord = { lat, lng };
+
+    const r = await fetch('https://nominatim.openstreetmap.org/reverse'
+      + `?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      { headers: { 'Accept-Language': 'pt-BR' } }).then((x) => x.json()).catch(() => null);
+    const a = r?.address ?? {};
+    const bairro = a.suburb ?? a.neighbourhood ?? a.city_district ?? '';
+
+    const põe = (id, v) => { const e = palco.querySelector('#' + id); if (e && v) e.value = v; };
+    põe('logradouro', a.road);
+    põe('numero', a.house_number);
+    põe('cidade', a.city ?? a.town ?? a.municipality);
+    põe('cep', a.postcode);
+    põe('uf', (a['ISO3166-2-lvl4'] ?? '').replace('BR-', ''));
+
+    // o bairro só entra se estiver na área atendida: escolher um bairro
+    // que a gente não entrega seria empurrar o problema para o carrinho
+    const sel = palco.querySelector('#bairro');
+    const naArea = [...(sel?.options ?? [])].find((o) =>
+      o.value.toLowerCase() === bairro.toLowerCase());
+    if (sel && naArea) sel.value = naArea.value;
+
+    botao.classList.remove('ocupado');
+    botao.querySelector('b').textContent = 'Usar minha localização';
+    if (bairro && !naArea) {
+      aviso(`Você está em ${bairro}, fora da nossa área por enquanto`, { bom: false });
+    } else {
+      aviso(a.road ? `Achei: ${a.road}` : 'Localização capturada');
+    }
+  } catch (e) {
+    botao.classList.remove('ocupado');
+    botao.querySelector('b').textContent = 'Usar minha localização';
+    aviso(e?.code === 1
+      ? 'Sem permissão de localização — dá para preencher na mão'
+      : 'Não consegui te localizar agora', { bom: false });
+  }
+}
+
+/**
+ * O farmacêutico na home.
+ *
+ * O bloco antigo era um cartão azul do tamanho de meia tela, com foto,
+ * CRF, selo de online e um discurso em primeira pessoa. Ocupava o espaço
+ * de uma oferta e falava como propaganda — que é exatamente o tom que
+ * faz ninguém clicar.
+ *
+ * Isto aqui é uma barra. Diz o que resolve, mostra que tem gente com CRF
+ * do outro lado, e sai da frente. A credencial vira uma linha pequena
+ * porque é o que ela é: garantia, não manchete.
+ */
+function barraFarmaceutico() {
+  const rt = S.dados.vitrine?.responsavel_tecnico;
+  return `
+  <button class="barra-farma" data-ir="conversa">
+    <span class="av-farma">${esc(iniciais(rt?.nome ?? 'Farmácia'))}<i class="ponto-online"></i></span>
+    <span class="tx">
+      <b>Pode tomar junto? Qual genérico serve?</b>
+      <span>${rt?.nome ? `${esc(rt.nome.split(' ')[0])} responde · ${esc(rt.crf ?? '')}` : 'Farmacêutico responde na hora'}</span>
+    </span>
+    <span class="ir-farma">${IC.balao}</span>
+  </button>`;
+}
+
+/**
+ * As capas em carrossel.
+ *
+ * Empilhadas como cartão na carteira: a de trás aparece um pouco por
+ * baixo, e o movimento é de tirar uma da frente, não de deslizar uma
+ * régua. O parallax é sutil de propósito — arte que anda mais que o
+ * cartão dá a sensação de profundidade; muito mais que isso embrulha
+ * o estômago em tela pequena.
+ */
+function capas() {
+  const cs = S.dados.capas ?? CAPAS_PADRAO;
+  return `
+  <div class="carteira" id="carteira">
+    ${cs.map((c, i) => `
+      <article class="capa-cartao" data-i="${i}" style="--cor:${c.cor};--cor2:${c.cor2}">
+        <span class="capa-arte">${c.arte}</span>
+        <span class="capa-tx">
+          ${c.etiqueta ? `<span class="capa-etq">${esc(c.etiqueta)}</span>` : ''}
+          <b>${esc(c.titulo)}</b>
+          <span>${esc(c.texto)}</span>
+        </span>
+        ${c.ir ? `<span class="capa-cta" data-ir="${c.ir}">${esc(c.cta ?? 'Ver')}</span>` : ''}
+      </article>`).join('')}
+  </div>
+  <div class="carteira-pontos">${cs.map((_, i) =>
+    `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>`;
+}
+
+/**
+ * As capas que vêm de fábrica.
+ *
+ * São promessas do serviço, não banner de fabricante: o que a farmácia
+ * faz de diferente. Quando existir campanha cadastrada, ela entra na
+ * frente — a estrutura é a mesma.
+ */
+const CAPAS_PADRAO = [
+  {
+    etiqueta: 'chega hoje', titulo: 'Em 40 minutos na sua porta',
+    texto: 'Separado por gente com CRF, com lote e validade conferidos.',
+    cor: '#1138B4', cor2: '#2E6BFF', ir: 'busca', cta: 'Comprar agora',
+    arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
+      <circle cx="82" cy="34" r="30" fill="rgba(255,255,255,.14)"/>
+      <circle cx="96" cy="86" r="18" fill="rgba(255,255,255,.10)"/>
+      <g fill="none" stroke="rgba(255,255,255,.92)" stroke-width="5" stroke-linecap="round">
+        <path d="M30 78h44"/><path d="M38 78a8 8 0 1 0 16 0"/>
+        <path d="M24 56h30l8 22"/><path d="M70 48l12 10-12 10"/>
+      </g></svg>`,
+  },
+  {
+    etiqueta: 'o armário', titulo: 'A gente lembra o que você tem em casa',
+    texto: 'Avisa antes de vencer e, se um lote for recolhido, avisa só quem levou.',
+    cor: '#0A7A55', cor2: '#12B87E', ir: 'armario', cta: 'Ver meu armário',
+    arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
+      <rect x="28" y="22" width="64" height="76" rx="10" fill="rgba(255,255,255,.14)"/>
+      <g fill="none" stroke="rgba(255,255,255,.92)" stroke-width="5" stroke-linecap="round">
+        <path d="M40 44h40M40 60h40M40 76h24"/><path d="M60 22v76"/>
+      </g></svg>`,
+  },
+  {
+    etiqueta: 'clube Solmedic+', titulo: 'Preço de plano, sem mensalidade',
+    texto: 'Mais barato em milhares de itens. É de graça, é só ativar.',
+    cor: '#7A3BC7', cor2: '#A96BF0', ir: 'conta', cta: 'Ativar',
+    arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
+      <circle cx="60" cy="60" r="34" fill="rgba(255,255,255,.14)"/>
+      <g fill="none" stroke="rgba(255,255,255,.94)" stroke-width="7" stroke-linecap="round">
+        <path d="M60 42v36M42 60h36"/>
+      </g></svg>`,
+  },
+];
+
+/**
+ * O movimento da carteira.
+ *
+ * Um observador por cartão em vez de escutar o scroll: o navegador avisa
+ * quando cada um cruza o meio da tela, e o parallax da arte anda com o
+ * deslocamento. Escutar scroll a 60 quadros por segundo em lista
+ * horizontal é o caminho curto para travar em aparelho fraco.
+ */
+function ligaCarteira() {
+  const trilho = palco.querySelector('#carteira');
+  if (!trilho || trilho.dataset.ligado) return;
+  trilho.dataset.ligado = '1';
+  const pontos = [...(trilho.nextElementSibling?.children ?? [])];
+  const cartoes = [...trilho.children];
+
+  const anda = () => {
+    const meio = trilho.scrollLeft + trilho.clientWidth / 2;
+    cartoes.forEach((c, i) => {
+      const centro = c.offsetLeft + c.offsetWidth / 2;
+      const desvio = Math.max(-1, Math.min(1, (centro - meio) / c.offsetWidth));
+      // a arte anda mais que o cartão: é isso que dá a profundidade
+      c.style.setProperty('--desvio', desvio.toFixed(3));
+      c.classList.toggle('a-frente', Math.abs(desvio) < 0.34);
+      pontos[i]?.classList.toggle('on', Math.abs(desvio) < 0.34);
+    });
+  };
+  trilho.addEventListener('scroll', () => requestAnimationFrame(anda), { passive: true });
+  requestAnimationFrame(anda);
 }

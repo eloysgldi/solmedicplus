@@ -6,15 +6,18 @@
    desenho vetorial — bonito, mas era sempre a mesma cidade imaginária,
    e quem conhece o próprio bairro percebia na hora.
 
-   Duas coisas que o desenho antigo escondia e esta versão assume:
+   O trajeto é o caminho de rua de verdade: vem do OSRM, o mesmo motor de
+   rota que o OpenStreetMap usa. A linha curva que existia antes cortava
+   quarteirão, atravessava rio e passava por cima de prédio — e qualquer
+   pessoa que conhece o bairro via que aquilo não era um caminho.
 
-     · as telhas vêm de um servidor público (tile.openstreetmap.org), o
-       que exige internet e crédito visível na tela — está no rodapé,
-       como manda a licença;
-     · a linha entre os dois pontos é o trajeto aproximado, não a rua
-       exata. Traçar rua exige um serviço de rota; enquanto não houver,
-       a linha é honesta sobre o que é: para onde está indo, não por
-       onde vai passar.
+   O mapa desenha a curva primeiro e troca pela rota real quando ela
+   chega: esperar o roteador para mostrar qualquer coisa deixaria a tela
+   em branco no pior momento, que é logo depois de pagar.
+
+   As telhas vêm de um servidor público (tile.openstreetmap.org), o que
+   exige internet e crédito visível na tela — está no rodapé, como manda
+   a licença.
    ============================================================ */
 
 const TELHA = 256;
@@ -99,7 +102,7 @@ export function criaMapa(container, opcoes = {}) {
       </linearGradient>
     </defs>
 
-    <path d="${ROTA}" fill="none" stroke="#fff" stroke-width="9"
+    <path class="rota-halo" d="${ROTA}" fill="none" stroke="#fff" stroke-width="9"
           stroke-linecap="round" opacity=".9"/>
     <path class="rota-base" d="${ROTA}" fill="none" stroke="var(--mapa-rota-base)"
           stroke-width="5.5" stroke-linecap="round"/>
@@ -135,14 +138,16 @@ export function criaMapa(container, opcoes = {}) {
     </g>
   </svg>
   <div class="mapa-credito">
-    ${aproximado ? '<span>trajeto aproximado</span>' : ''}
+    <span class="trecho">calculando o trajeto…</span>
     <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>
   </div>`;
 
   const svg = container.querySelector('svg');
   const rota = svg.querySelector('.rota');
+  const base = svg.querySelector('.rota-base');
+  const halo = svg.querySelector('.rota-halo');
   const moto = svg.querySelector('.moto');
-  const total = rota.getTotalLength();
+  let total = rota.getTotalLength();
   rota.style.strokeDasharray = total;
 
   let atual = Math.max(0, Math.min(1, progresso));
@@ -161,9 +166,30 @@ export function criaMapa(container, opcoes = {}) {
   }
   posiciona(atual);
 
+  // troca a curva pelo caminho de rua assim que o roteador responder
+  let percurso = null;
+  rotaDeRua(origem, destino).then((r) => {
+    if (!r?.pontos?.length) return;
+    percurso = r;
+    const d = r.pontos.map((pt, i) => {
+      const q = px(pt);
+      return (i ? 'L ' : 'M ') + q.x.toFixed(1) + ' ' + q.y.toFixed(1);
+    }).join(' ');
+    for (const el of [halo, base, rota]) el.setAttribute('d', d);
+    total = rota.getTotalLength();
+    rota.style.strokeDasharray = total;
+    posiciona(atual);
+    const cr = container.querySelector('.mapa-credito .trecho');
+    if (cr) {
+      const km = (r.metros / 1000).toFixed(1).replace('.', ',');
+      cr.textContent = `${km} km · ${Math.round(r.segundos / 60)} min de moto`;
+    }
+  }).catch(() => { /* sem roteador, a curva continua valendo */ });
+
   return {
     get progresso() { return atual; },
-    get metros() { return Math.round(distancia(origem, destino)); },
+    get metros() { return percurso?.metros ?? Math.round(distancia(origem, destino)); },
+    get rua() { return !!percurso; },
     /** Leva a moto ate `alvo` em `ms`, com a mesma curva do resto do app. */
     anima(alvo, ms = 1400) {
       cancelAnimationFrame(quadro);
@@ -219,4 +245,49 @@ export function progressoDoStatus(status) {
     em_separacao: 0.04, aguardando_cliente: 0.04, pronto: 0.08,
     em_rota: 0.62, entregue: 1, cancelado: 0,
   })[status] ?? 0;
+}
+
+/**
+ * O caminho de rua, pelo OSRM — o mesmo motor de rota do OpenStreetMap.
+ *
+ * Duas decisões que valem explicação:
+ *
+ *   · o servidor é o público de demonstração, que tem limite de uso e
+ *     não promete disponibilidade. Por isso nada aqui é obrigatório: se
+ *     falhar, o mapa fica com a curva e o app continua funcionando. Em
+ *     produção com volume, troca-se a URL por uma instância própria —
+ *     é uma constante;
+ *   · o resultado fica em memória por trajeto. Dois pedidos para o mesmo
+ *     endereço não perguntam duas vezes, e reabrir o pedido não bate no
+ *     servidor de novo.
+ */
+const OSRM = 'https://router.project-osrm.org/route/v1/driving';
+const guardado = new Map();
+
+export async function rotaDeRua(origem, destino) {
+  const chave = [origem.lat, origem.lng, destino.lat, destino.lng]
+    .map((n) => n.toFixed(5)).join(',');
+  if (guardado.has(chave)) return guardado.get(chave);
+
+  const promessa = (async () => {
+    const alvo = `${OSRM}/${origem.lng},${origem.lat};${destino.lng},${destino.lat}`
+      + '?overview=full&geometries=geojson';
+    const controle = new AbortController();
+    // o mapa não pode ficar pendurado esperando rota: 6 segundos e desiste
+    const corta = setTimeout(() => controle.abort(), 6000);
+    try {
+      const r = await fetch(alvo, { signal: controle.signal });
+      const d = await r.json();
+      const via = d?.routes?.[0];
+      if (d.code !== 'Ok' || !via?.geometry?.coordinates?.length) return null;
+      return {
+        pontos: via.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
+        metros: Math.round(via.distance),
+        segundos: Math.round(via.duration),
+      };
+    } finally { clearTimeout(corta); }
+  })().catch(() => null);
+
+  guardado.set(chave, promessa);
+  return promessa;
 }
