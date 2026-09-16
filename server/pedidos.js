@@ -233,7 +233,10 @@ export function detalhe(orderId) {
     ofertas: todos(`SELECT * FROM substitution_offers WHERE order_id = ? AND status = 'pendente'`, orderId),
     avaliacao: avaliacoes.doPedido(orderId),
     cliente: um('SELECT id, nome, telefone FROM users WHERE id = ?', o.user_id),
-    farmacia: um('SELECT id, nome_fantasia, bairro, cnpj FROM pharmacies WHERE id = ?', o.pharmacy_id),
+    // lat/lng entram aqui porque o mapa do acompanhamento é de verdade:
+    // sem as duas pontas ele não tem o que desenhar
+    farmacia: um(`SELECT id, nome_fantasia, bairro, cnpj, lat, lng
+                    FROM pharmacies WHERE id = ?`, o.pharmacy_id),
     endereco: um('SELECT * FROM addresses WHERE id = ?', o.address_id),
     eventos: todos('SELECT * FROM order_events WHERE order_id = ? ORDER BY criado_em', orderId),
   };

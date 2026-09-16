@@ -41,12 +41,29 @@ const gerente   = user('Marcos Aurélio', 'gerente@solmedic.com.br', 'loja123');
 const farmaceut = user('Helena Sousa', 'farmaceutica@solmedic.com.br', 'crf123');
 const motoboy   = user('Edilson S.', 'entregador@solmedic.com.br', 'moto123');
 
+/**
+ * Coordenadas dos bairros da demonstração.
+ *
+ * O mapa do acompanhamento usa telha de verdade do OpenStreetMap, e sem
+ * lat/lng ele não tem o que desenhar. São pontos plausíveis dentro de
+ * Fortaleza — quando os endereços forem reais, quem preenche isto é o
+ * geocodificador no cadastro, não esta tabela.
+ */
+const PONTO = {
+  'Centro':            [-3.72750, -38.52700],
+  'Jardim Primavera':  [-3.74180, -38.51240],
+  'Vila Nova':         [-3.75020, -38.53900],
+  'Bela Vista':        [-3.73410, -38.55120],
+  'Alto da Serra':     [-3.71620, -38.50310],
+};
+const ondeFica = (bairro) => PONTO[bairro] ?? PONTO['Centro'];
 const endereco = id();
 if (!um('SELECT id FROM addresses WHERE user_id = ?', cliente)) {
-  roda(`INSERT INTO addresses (id,user_id,apelido,logradouro,numero,bairro,cidade,uf,cep,padrao)
-        VALUES (?,?,?,?,?,?,?,?,?,?)`,
+  const [la, lo] = ondeFica('Jardim Primavera');
+  roda(`INSERT INTO addresses (id,user_id,apelido,logradouro,numero,bairro,cidade,uf,cep,lat,lng,padrao)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     endereco, cliente, 'Casa', 'Rua das Laranjeiras', '214', 'Jardim Primavera',
-    'Fortaleza', 'CE', '60000-000', 1);
+    'Fortaleza', 'CE', '60000-000', la, lo, 1);
 }
 const enderecoId = um('SELECT id FROM addresses WHERE user_id = ?', cliente).id;
 
@@ -137,6 +154,7 @@ function farmacia({ cnpj, razao, fantasia, bairro, gerenteId, comissao = 11 }) {
       cnpj, razao_social: razao, nome_fantasia: fantasia, bairro,
       cidade: 'Fortaleza', uf: 'CE', telefone: '85 3000-0000',
       logradouro: 'Av. Central', numero: '1200',
+      lat: ondeFica('Centro')[0], lng: ondeFica('Centro')[1],
     });
     f = um('SELECT * FROM pharmacies WHERE id = ?', r.id);
     roda('UPDATE pharmacies SET comissao_pct = ? WHERE id = ?', comissao, f.id);
@@ -318,10 +336,10 @@ if (!um("SELECT id FROM users WHERE email = 'marta@exemplo.com'")) {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '') + '@exemplo.com';
     const uid = user(nome, email, 'cliente123', { socio, telefone: tel });
     const aid = id();
-    roda(`INSERT INTO addresses (id,user_id,apelido,logradouro,numero,bairro,cidade,uf,cep,padrao)
-          VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    roda(`INSERT INTO addresses (id,user_id,apelido,logradouro,numero,bairro,cidade,uf,cep,lat,lng,padrao)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       aid, uid, 'Casa', 'Rua das Acácias', String(100 + seqPedido % 400), bairro,
-      'Fortaleza', 'CE', '60000-000', 1);
+      'Fortaleza', 'CE', '60000-000', ...ondeFica(bairro), 1);
 
     for (const dias of quando) {
       const oid = id();

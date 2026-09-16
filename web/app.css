@@ -1224,3 +1224,52 @@ a{color:inherit}
   margin-bottom:12px;font-variation-settings:"wdth" 108,"wght" 740}
 .valor-pix span{display:block;font-family:var(--sans,inherit);font-size:11.5px;font-weight:600;
   letter-spacing:0;color:var(--ink-3);margin-top:2px}
+
+/* ---------- mapa de verdade: telhas do OpenStreetMap ---------- */
+.mapa-telhas{position:absolute;inset:0;overflow:hidden}
+.mapa-telhas img{
+  position:absolute;width:256px;height:256px;display:block;
+  /* a telha nasce colorida demais para o azul da marca: dessatura um
+     pouco e clareia, para a rota ser a coisa mais viva da tela */
+  filter:saturate(.62) brightness(1.06) contrast(.96);
+  animation:telha-entra .45s ease both;
+}
+@keyframes telha-entra{from{opacity:0}to{opacity:1}}
+.mapa-svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mapa-credito{
+  position:absolute;right:8px;bottom:8px;display:flex;gap:8px;align-items:center;
+  font-size:9.5px;letter-spacing:.01em;z-index:3;
+}
+.mapa-credito span,.mapa-credito a{
+  background:rgba(255,255,255,.82);backdrop-filter:blur(6px);
+  padding:3px 7px;border-radius:6px;color:var(--ink-3);text-decoration:none;
+}
+.mapa-sem-coord{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+  padding:0 28px;font-size:13px;color:var(--ink-3);background:var(--mapa-fundo);
+}
+
+/* ---------- selo de campanha no card, como na prateleira ---------- */
+.prod{position:relative}
+.selo-campanha{
+  position:absolute;top:0;left:0;z-index:2;
+  font-size:10px;font-weight:800;letter-spacing:.01em;
+  padding:5px 9px;border-top-left-radius:var(--r2);border-bottom-right-radius:11px;
+  white-space:nowrap;max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;
+}
+.selo-campanha.quente{background:#FBE9EC;color:var(--hot)}
+.selo-campanha.lab{background:#FFF1DC;color:#8A5A0B}
+.selo-campanha.normal{background:var(--wash);color:var(--brand)}
+.prod.com-selo .arte{padding-top:12px}
+
+/* ---------- advertência do Ministério da Saúde ---------- */
+.aviso-ms{
+  display:flex;gap:11px;align-items:flex-start;margin:10px 18px 0;padding:13px 15px;
+  background:var(--wash);border-radius:var(--r2);
+}
+.aviso-ms .ic{
+  width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--brand);color:#fff;font-size:12px;font-weight:800;margin-top:1px;
+}
+.aviso-ms .tx{font-size:12.6px;line-height:1.5;color:var(--ink-2)}
+.aviso-ms .tx b{display:block;color:var(--ink);font-size:13.2px;margin-bottom:3px}

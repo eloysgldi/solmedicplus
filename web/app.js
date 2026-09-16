@@ -72,11 +72,28 @@ function blocoPreco(p, { convite = true } = {}) {
   </span>${convite && vale ? `<span class="convite-plano">${sinal(10)} com o plano: ${brl(p.preco_socio_centavos)}</span>` : ''}`;
 }
 
+/**
+ * O selo de campanha.
+ *
+ * Não é enfeite: é o que faz a pessoa entender em meio segundo por que
+ * aquele preço está diferente. Sai do próprio dado — desconto grande é
+ * "super oferta", genérico com corte é "desconto de laboratório" — para
+ * ninguém precisar cadastrar etiqueta à mão e ela envelhecer mentindo.
+ */
+function seloDaOferta(p, off) {
+  if (!off) return '';
+  if (off >= 25) return ['quente', 'Super oferta'];
+  if (p.generico) return ['lab', 'Desconto de laboratório'];
+  return ['normal', `Economize ${off}%`];
+}
+
 function cardProduto(p) {
   const off = p.preco_de_centavos && p.preco_de_centavos > p.preco_centavos
     ? Math.round((1 - p.preco_centavos / p.preco_de_centavos) * 100) : 0;
+  const selo = seloDaOferta(p, off);
   return `
-  <button class="prod" data-ir="produto/${p.ean}">
+  <button class="prod${selo ? ' com-selo' : ''}" data-ir="produto/${p.ean}">
+    ${selo ? `<span class="selo-campanha ${selo[0]}">${selo[1]}</span>` : ''}
     <span class="arte">${embalagem(p)}
       ${off ? `<span class="desconto">−${off}%</span>` : ''}
       <span class="mais" data-add="${p.ean}" role="button" aria-label="Adicionar">${IC.mais}</span></span>
@@ -424,6 +441,12 @@ function telaProduto() {
         <span class="tx"><b>Bula completa</b><span>Como tomar, efeitos e contraindicações · Anvisa</span></span>
         ${IC.seta}
       </a>
+
+      ${avisosLegais(p).map((a) => `
+        <div class="aviso-ms">
+          <span class="ic">${IC.info ?? '!'}</span>
+          <span class="tx"><b>${a.titulo}</b>${esc(a.texto)}</span>
+        </div>`).join('')}
 
       <p class="rodape-legal">
         Vendido por ${esc(S.dados.vitrine?.nome_fantasia ?? S.inicio?.farmacia?.nome ?? 'Solmedic+')}${S.dados.vitrine?.cnpj ? `, CNPJ ${esc(S.dados.vitrine.cnpj)}` : ''}.
@@ -1369,7 +1392,11 @@ function montaRastreio() {
 
   if (!caixa.firstElementChild) {
     mapaVivo?.destroi();
-    mapaVivo = criaMapa(caixa, { progresso: alvo });
+    mapaVivo = criaMapa(caixa, {
+      progresso: alvo,
+      origem: p?.farmacia?.lat ? { lat: p.farmacia.lat, lng: p.farmacia.lng } : null,
+      destino: p?.endereco?.lat ? { lat: p.endereco.lat, lng: p.endereco.lng } : null,
+    });
     // em rota, a moto continua andando devagar até chegar
     if (p?.status === 'em_rota') setTimeout(() => mapaVivo?.anima(0.92, 26000), 700);
   } else if (mapaVivo) {
@@ -2271,3 +2298,42 @@ window.addEventListener('hashchange', () => {
     api('GET', '/api/inicio').then((d) => { S.inicio = d; desenhaDoca(); }).catch(() => {});
   }
 })();
+
+/**
+ * As advertências que a lei obriga.
+ *
+ * Não é texto decorativo: a frase do medicamento vem da RDC 96/2008, e a
+ * do aleitamento materno da NBCAL (Lei 11.265/2006), que manda o aviso
+ * aparecer em qualquer material de fórmula infantil, mamadeira e chupeta.
+ * Farmácia que esquece disso toma multa — e, o que importa mais, engana
+ * quem está decidindo com o filho no colo.
+ */
+function avisosLegais(p) {
+  const avisos = [];
+  const cat = p.categoria ?? '';
+  const ehRemedio = !!p.principio_ativo && p.principio_ativo !== '—';
+
+  if (cat === 'bebe' || /f[óo]rmula infantil|mamadeira|chupeta/i.test(p.nome ?? '')) {
+    avisos.push({
+      titulo: 'O Ministério da Saúde adverte:',
+      texto: 'O aleitamento materno evita infecções e alergias e é recomendado '
+        + 'até os dois anos de idade ou mais.',
+    });
+  }
+  if (ehRemedio && !p.requer_receita) {
+    avisos.push({
+      titulo: 'O Ministério da Saúde adverte:',
+      texto: 'Se os sintomas persistirem, o médico deverá ser consultado. '
+        + 'Ao persistirem os sintomas, procure orientação de um profissional de saúde.',
+    });
+  }
+  if (p.requer_receita) {
+    avisos.push({
+      titulo: 'Venda sob prescrição médica.',
+      texto: p.retem_receita
+        ? 'A receita fica retida na farmácia — o entregador recolhe a via com você.'
+        : 'A receita é conferida pelo farmacêutico antes de o pedido ser separado.',
+    });
+  }
+  return avisos;
+}
