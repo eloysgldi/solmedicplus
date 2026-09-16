@@ -3,7 +3,7 @@
    Faz três coisas: instala o app na tela inicial, deixa o catálogo
    navegável sem rede, e recebe as notificações.
    ============================================================ */
-const VERSAO = 'solmedic-v1';
+const VERSAO = 'solmedic-v3';
 const CASCA = ['/', '/index.html', '/app.css', '/app.js', '/pkg.js',
                '/marca.js', '/mapa.js', '/marca.svg', '/manifest.json'];
 
@@ -43,7 +43,7 @@ self.addEventListener('push', (e) => {
   try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: e.data?.text() ?? '' }; }
   const opcoes = {
     body: d.corpo ?? '',
-    icon: '/logo.png',
+    icon: '/icone-192.png',
     badge: '/marca.svg',
     tag: d.tag ?? 'solmedic',
     renotify: !!d.renotify,

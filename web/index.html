@@ -12,7 +12,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Solmedic+">
-<link rel="apple-touch-icon" href="/logo.png">
+<!-- o iOS não arredonda nem preenche nada: o que estiver aqui vai para a tela
+     como está, e canto transparente vira moldura preta. Por isso o ícone
+     gerado, que sangra até a borda (node server/icones.js) -->
+<link rel="apple-touch-icon" href="/icone-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="/icone-512.png">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
