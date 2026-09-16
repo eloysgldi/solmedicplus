@@ -299,13 +299,16 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
       svg.setAttribute('height', alt);
       svg.setAttribute('viewBox', `0 0 ${larg} ${alt}`);
       // o piloto fica no terco de baixo: o que importa e o que vem pela frente
-      palco.style.transform = `translateY(12%) rotate(${-giro}deg)`;
+      palco.style.transform = `translate(var(--gx,0px), var(--gy,0px)) scale(var(--gz,1)) translateY(12%) rotate(${-giro}deg)`;
       pintaTelhas();
       desenhaRota(andadoAte);
     },
     poeRota(lista, listaParadas = []) { pontos = lista ?? []; paradas = listaParadas; desenhaRota(); },
+    gestos: ligaGestosNav(container, palco,
+      () => container.classList.add('mexido'),
+      () => container.classList.remove('mexido')),
     /** Solta o giro: o mapa volta a apontar para o norte. */
-    soltaNorte() { seguindo = false; giro = 0; palco.style.transform = 'translateY(12%)'; },
+    soltaNorte() { seguindo = false; giro = 0; palco.style.transform = 'translate(var(--gx,0px), var(--gy,0px)) scale(var(--gz,1)) translateY(12%)'; },
     voltaASeguir() { seguindo = true; },
     get seguindo() { return seguindo; },
   };
@@ -402,3 +405,96 @@ export function fraseDaManobra(passo, distancia) {
 }
 
 const minuscula = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+
+/**
+ * Gestos no mapa de navegação.
+ *
+ * Quem dirige também precisa conferir o quarteirão seguinte sem sair da
+ * rota. Aqui o gesto mexe num segundo transform, por fora do que a
+ * navegação usa para girar e seguir — assim dá para afastar, olhar e
+ * largar, e o mapa volta a seguir a moto sozinho depois de três
+ * segundos parado. Navegador que fica preso no zoom que você deu é
+ * pior do que navegador sem zoom.
+ */
+function ligaGestosNav(container, palco, aoMexer, aoSoltar) {
+  let escala = 1, dx = 0, dy = 0, base = 1, dist0 = 0;
+  let arrastando = false, x0 = 0, y0 = 0, volta = null;
+
+  const aplica = () => {
+    palco.style.setProperty('--gx', `${dx}px`);
+    palco.style.setProperty('--gy', `${dy}px`);
+    palco.style.setProperty('--gz', escala);
+  };
+  const mexeu = () => {
+    clearTimeout(volta);
+    aoMexer();
+    // três segundos parado e o mapa volta a acompanhar a moto sozinho
+    volta = setTimeout(() => {
+      escala = 1; dx = 0; dy = 0;
+      palco.style.transition = 'transform .5s cubic-bezier(.32,.72,0,1)';
+      aplica();
+      aoSoltar();
+      setTimeout(() => { palco.style.transition = ''; }, 520);
+    }, 3000);
+  };
+
+  const doisDedos = (e) => Math.hypot(
+    e.touches[0].clientX - e.touches[1].clientX,
+    e.touches[0].clientY - e.touches[1].clientY);
+
+  container.addEventListener('touchstart', (e) => {
+    clearTimeout(volta);
+    if (e.touches.length === 2) { dist0 = doisDedos(e); base = escala; arrastando = false; }
+    else { arrastando = true; x0 = e.touches[0].clientX - dx; y0 = e.touches[0].clientY - dy; }
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && dist0) {
+      escala = Math.max(0.5, Math.min(5, base * (doisDedos(e) / dist0)));
+    } else if (arrastando) {
+      dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
+    }
+    aplica(); aoMexer();
+  }, { passive: true });
+
+  container.addEventListener('touchend', (e) => {
+    if (e.touches.length) return;
+    arrastando = false; dist0 = 0;
+    if (escala !== 1 || dx || dy) mexeu();
+  }, { passive: true });
+
+  container.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    escala = Math.max(0.5, Math.min(5, escala * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+    aplica(); mexeu();
+  }, { passive: false });
+
+  container.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;
+    clearTimeout(volta);
+    arrastando = true; x0 = e.clientX - dx; y0 = e.clientY - dy;
+    container.setPointerCapture(e.pointerId);
+  });
+  container.addEventListener('pointermove', (e) => {
+    if (!arrastando || e.pointerType === 'touch') return;
+    dx = e.clientX - x0; dy = e.clientY - y0; aplica(); aoMexer();
+  });
+  container.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'touch' || !arrastando) return;
+    arrastando = false;
+    if (escala !== 1 || dx || dy) mexeu();
+  });
+
+  return {
+    maisPerto() { escala = Math.min(5, escala * 1.5); aplica(); mexeu(); },
+    maisLonge() { escala = Math.max(0.5, escala / 1.5); aplica(); mexeu(); },
+    reenquadra() {
+      clearTimeout(volta);
+      escala = 1; dx = 0; dy = 0;
+      palco.style.transition = 'transform .4s cubic-bezier(.32,.72,0,1)';
+      aplica(); aoSoltar();
+      setTimeout(() => { palco.style.transition = ''; }, 420);
+    },
+    get mexido() { return escala !== 1 || !!dx || !!dy; },
+  };
+}

@@ -88,8 +88,11 @@ function blocoPreco(p) {
  */
 function seloDaOferta(p, off) {
   if (!off) return '';
-  if (off >= 25) return ['quente', 'Super oferta'];
-  if (p.generico) return ['lab', 'Desconto de laboratório'];
+  // o percentual mora AQUI, e só aqui. Antes existia também um chip
+  // vermelho no canto da arte, e os dois brigavam pelo mesmo pedaço do
+  // card: etiqueta em cima de etiqueta, dizendo a mesma coisa duas vezes
+  if (off >= 25) return ['quente', `Super oferta · ${off}% off`];
+  if (p.generico) return ['lab', `Laboratório · ${off}% off`];
   return ['normal', `Economize ${off}%`];
 }
 
@@ -101,7 +104,6 @@ function cardProduto(p) {
   <button class="prod${selo ? ' com-selo' : ''}" data-ir="produto/${p.ean}">
     ${selo ? `<span class="selo-campanha ${selo[0]}">${selo[1]}</span>` : ''}
     <span class="arte">${embalagem(p)}
-      ${off ? `<span class="desconto">−${off}%</span>` : ''}
       <span class="mais" data-add="${p.ean}" role="button" aria-label="Adicionar">${IC.mais}</span></span>
     <span class="info">
       <span class="nome">${esc(p.nome)}</span>

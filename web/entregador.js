@@ -233,9 +233,12 @@ function telaNavegando() {
       <button class="nav-bt ${falaLigada() ? 'on' : ''}" data-acao="voz"
         aria-label="${falaLigada() ? 'Desligar a voz' : 'Ligar a voz'}">
         ${falaLigada() ? '🔊' : '🔇'}</button>
+      <button class="nav-bt" data-acao="zoom-mais" aria-label="Aproximar">+</button>
+      <button class="nav-bt" data-acao="zoom-menos" aria-label="Afastar">−</button>
       <button class="nav-bt ${S.mapa?.seguindo ? '' : 'solto'}" data-acao="norte"
         aria-label="Girar o mapa">${S.mapa?.seguindo ? '⬆' : 'N'}</button>
     </div>
+    <button class="voltar-rota" data-acao="reenquadrar">Voltar para a rota</button>
 
     <div class="nav-pe">
       <div class="nav-resumo">
@@ -469,11 +472,36 @@ document.addEventListener('click', async (ev) => {
     if (e) navegaAte(e);
     return;
   }
-  if (acao === 'voz') { alternaVoz(); desenha(); return; }
+  /**
+   * O botao de voz nao pode redesenhar a tela.
+   *
+   * Redesenhar recria o mapa do zero -- e o mapa novo nasce apontando
+   * para o norte. Era isso que dava a sensacao de que o botao de som
+   * "girava o mapa": ele nao girava, ele reiniciava. Aqui so o proprio
+   * botao muda.
+   */
+  if (acao === 'voz') {
+    const ligada = alternaVoz();
+    b.classList.toggle('on', ligada);
+    b.textContent = ligada ? '🔊' : '🔇';
+    b.setAttribute('aria-label', ligada ? 'Desligar a voz' : 'Ligar a voz');
+    vibra(20);
+    if (ligada && S.rota?.passos?.[S.passoAtual]) {
+      const passo = S.rota.passos[S.passoAtual];
+      const d = S.pos && passo.em ? metros(S.pos, passo.em) : passo.metros;
+      fala(fraseDaManobra(passo, d), { forcar: true });
+    }
+    return;
+  }
+  if (acao === 'zoom-mais') { S.mapa?.gestos.maisPerto(); vibra(12); return; }
+  if (acao === 'zoom-menos') { S.mapa?.gestos.maisLonge(); vibra(12); return; }
+  if (acao === 'reenquadrar') { S.mapa?.gestos.reenquadra(); vibra(18); return; }
   if (acao === 'voltar-fila') { S.tela = 'fila'; S.navegando = null; desenha(); return; }
   if (acao === 'norte') {
-    if (S.mapa?.seguindo) S.mapa.soltaNorte(); else { S.mapa?.voltaASeguir(); desenhaMapa(); }
-    desenha();
+    if (S.mapa?.seguindo) S.mapa.soltaNorte();
+    else { S.mapa?.voltaASeguir(); desenhaMapa(); }
+    b.classList.toggle('solto', !S.mapa?.seguindo);
+    b.textContent = S.mapa?.seguindo ? '⬆' : 'N';
     return;
   }
 
