@@ -54,22 +54,28 @@ const ROTULO = {
 /* ============ blocos reutilizados ============ */
 /**
  * Preço.
- * Quem já é do plano está vendo o preço do plano — não precisa de selo
+ * O selo sai do proprio dado, nao de etiqueta cadastrada a mao
  * dizendo isso em cima de cada card. O selo virou convite, e só aparece
  * para quem ainda não entrou.
  */
-function blocoPreco(p, { convite = true } = {}) {
+/**
+ * O preço.
+ *
+ * Um preço só, igual para todo mundo. O clube foi embora: preço de sócio
+ * cria duas verdades na mesma prateleira e obriga a pessoa a fazer conta
+ * para saber quanto custa — que é exatamente o contrário do que farmácia
+ * de bairro faz bem. O que sobra é o que importa: quanto é, e quanto
+ * caiu em relação ao preço de tabela.
+ */
+function blocoPreco(p) {
   const paga = p.preco_final_centavos ?? p.preco_centavos;
   const tabela = p.preco_de_centavos ?? p.preco_centavos;
   const off = tabela > paga ? Math.round((1 - paga / tabela) * 100) : 0;
-  const ehSocio = !!S.inicio?.user?.socio;
-  const vale = !ehSocio && p.preco_socio_centavos && p.preco_socio_centavos < paga;
 
   return `<span class="preco">
-    <span class="agora">${preco(paga)}${ehSocio && paga < (p.preco_centavos ?? paga)
-      ? `<i class="mais-plano" title="preço do plano">${sinal(9)}</i>` : ''}</span>
+    <span class="agora">${preco(paga)}</span>
     ${tabela > paga ? `<span class="antes"><s>${brl(tabela)}</s>${off ? `<b>−${off}%</b>` : ''}</span>` : ''}
-  </span>${convite && vale ? `<span class="convite-plano">${sinal(10)} com o plano: ${brl(p.preco_socio_centavos)}</span>` : ''}`;
+  </span>`;
 }
 
 /**
@@ -318,7 +324,7 @@ function linhaAchado(p) {
       <span class="nome">${esc(p.nome)}</span>
       <span class="ficha">${esc([p.fabricante, p.generico ? 'genérico' : 'referência', p.apresentacao].filter(Boolean).join(' · '))}</span>
       <span class="tarja ${rx ? 't-rx' : 't-livre'}"><i></i>${rx ? 'precisa de receita' : 'venda livre'}</span>
-      <span style="margin-top:7px">${blocoPreco({ ...p, preco_final_centavos: p.menor_socio_centavos && S.inicio?.user?.socio ? p.menor_socio_centavos : p.menor_preco_centavos, preco_centavos: p.menor_preco_centavos, preco_socio_centavos: p.menor_socio_centavos })}</span>
+      <span style="margin-top:7px">${blocoPreco({ ...p, preco_final_centavos: p.menor_preco_centavos, preco_centavos: p.menor_preco_centavos })}</span>
       ${p.economia_centavos > 0 ? `<span class="economia">↓ ${brl(p.economia_centavos)} mais barato no genérico</span>` : ''}
       ${p.pmc_centavos ? `<span class="pmc">PMC ${brl(p.pmc_centavos)} · ${p.lojas} ${p.lojas === 1 ? 'farmácia' : 'farmácias'}</span>` : ''}
     </span>
@@ -339,9 +345,7 @@ function telaProduto() {
   const noCarrinho = S.carrinho[p.ean] ?? 0;
   const dados = oferta ? {
     ...p, preco_centavos: oferta.preco_centavos,
-    preco_final_centavos: S.inicio?.user?.socio && oferta.preco_socio_centavos
-      ? oferta.preco_socio_centavos : oferta.preco_centavos,
-    preco_socio_centavos: oferta.preco_socio_centavos,
+    preco_final_centavos: oferta.preco_centavos,
     preco_de_centavos: oferta.preco_de_centavos,
   } : p;
 
@@ -373,11 +377,6 @@ function telaProduto() {
             ${p.pmc_centavos ? `<span class="pmc-nota">teto CMED ${brl(p.pmc_centavos)}</span>` : ''}
           </div>
         </div>
-        ${S.inicio?.user?.socio && dados.preco_final_centavos < oferta.preco_centavos
-          ? `<div class="plano-aplicado">${sinal(12)} preço do plano aplicado · você economiza ${brl(oferta.preco_centavos - dados.preco_final_centavos)}</div>`
-          : oferta.preco_socio_centavos && oferta.preco_socio_centavos < dados.preco_final_centavos
-            ? `<button class="plano-convite" data-ir="conta">${sinal(12)} Com o plano sairia ${brl(oferta.preco_socio_centavos)} · ativar é de graça</button>`
-            : ''}
 
         <div class="entrega-tira">
           <span class="item"><b>⚡ ${oferta.estoque > 0 ? 'Chega hoje' : 'Sem estoque'}</b>
@@ -991,15 +990,6 @@ function telaConta() {
       </div>
     </div>
 
-    <div class="cartao-plano ${u?.socio ? 'ativo' : ''}">
-      <span class="marca-dagua-plano">${marca({ tam: 130, cheia: false })}</span>
-      <div class="selo-plano">${sinal(13)} solmedic <b>+</b></div>
-      <h3>${u?.socio ? 'Seu plano está ativo' : 'Ative o plano, é de graça'}</h3>
-      <p>${u?.socio
-        ? 'Preço de plano em mais de 4 mil itens, e a gente avisa antes da sua recompra acabar.'
-        : 'Preço menor em mais de 4 mil itens e lembrete de recompra. Sem mensalidade, sem pegadinha.'}</p>
-      ${u?.socio ? '' : '<span class="botao-plano">Ativar agora</span>'}
-    </div>
 
     <div class="secao"><h2>O que você tem em casa</h2></div>
     <button class="cartao-armario" data-ir="armario">
@@ -1955,7 +1945,7 @@ function ligaFormulario() {
         const r = novo
           ? await api('POST', '/api/auth/registrar', {
               nome: val('nome'), email: val('email'), senha: val('senha'),
-              telefone: val('tel') || null, socio: 1 })
+              telefone: val('tel') || null })
           : await api('POST', '/api/auth/login', { email: val('email'), senha: val('senha') });
         S.token = r.token; localStorage.setItem('sm_token', r.token);
         S.ocupado = false; telaAtual = null; palco.innerHTML = '';
@@ -2497,9 +2487,9 @@ const CAPAS_PADRAO = [
       </g></svg>`,
   },
   {
-    etiqueta: 'clube Solmedic+', titulo: 'Preço de plano, sem mensalidade',
-    texto: 'Mais barato em milhares de itens. É de graça, é só ativar.',
-    cor: '#7A3BC7', cor2: '#A96BF0', ir: 'conta', cta: 'Ativar',
+    etiqueta: 'receita na mão', titulo: 'Manda a foto, a gente monta o pedido',
+    texto: 'A farmacêutica lê, confere e separa. Você só confirma.',
+    cor: '#7A3BC7', cor2: '#A96BF0', ir: 'receitas', cta: 'Enviar receita',
     arte: `<svg viewBox="0 0 120 120" aria-hidden="true">
       <circle cx="60" cy="60" r="34" fill="rgba(255,255,255,.14)"/>
       <g fill="none" stroke="rgba(255,255,255,.94)" stroke-width="7" stroke-linecap="round">

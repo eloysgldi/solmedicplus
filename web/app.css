@@ -1374,3 +1374,23 @@ a{color:inherit}
 .usar-gps .tx span{display:block;font-size:11.5px;color:var(--ink-2);margin-top:2px}
 .usar-gps.ocupado .ic-gps{animation:gps-gira 1s linear infinite}
 @keyframes gps-gira{to{transform:rotate(360deg)}}
+
+/* ---------- mapa: gesto de arrastar e pinçar ---------- */
+.mapa{touch-action:none;cursor:grab}
+.mapa.arrastando{cursor:grabbing}
+.mapa-palco{position:absolute;inset:0;transform-origin:50% 50%;will-change:transform}
+.mapa-zoom{
+  position:absolute;right:10px;top:12px;z-index:4;display:grid;gap:6px;
+}
+.mapa-zoom button{
+  width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(8px);box-shadow:0 2px 10px -3px rgba(7,16,30,.4);
+  font-size:17px;font-weight:700;color:var(--ink);display:grid;place-items:center;
+  transition:transform .14s ease,background .2s ease;
+}
+.mapa-zoom button:active{transform:scale(.92);background:var(--wash)}
+/* o botão de reenquadrar só aparece depois que a pessoa mexeu no mapa:
+   antes disso ele não teria o que fazer */
+.mapa-zoom .z-centro{opacity:0;pointer-events:none;transform:scale(.7)}
+.mapa.mexido .z-zoom,.mapa.mexido .mapa-zoom .z-centro{opacity:1;pointer-events:auto;transform:none}
+.mapa-zoom .z-centro{color:var(--brand)}

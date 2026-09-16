@@ -65,14 +65,14 @@ export function criaMapa(container, opcoes = {}) {
     return { get progresso() { return 0; }, anima() {}, destroi() {} };
   }
 
-  const larg = container.clientWidth || 380;
-  const alt = container.clientHeight || 260;
-  const z = zoomQueCabe(origem, destino, larg, alt);
+  let larg = container.clientWidth || 380;
+  let alt = container.clientHeight || 260;
+  let z = zoomQueCabe(origem, destino, larg, alt);
 
   // o centro fica entre os dois pontos, puxado um pouco para cima:
   // a folha de informação cobre a parte de baixo da tela
-  const cx = (xDe(origem.lng, z) + xDe(destino.lng, z)) / 2;
-  const cy = (yDe(origem.lat, z) + yDe(destino.lat, z)) / 2 + (alt * 0.10) / TELHA;
+  let cx = (xDe(origem.lng, z) + xDe(destino.lng, z)) / 2;
+  let cy = (yDe(origem.lat, z) + yDe(destino.lat, z)) / 2 + (alt * 0.10) / TELHA;
 
   // pixel do ponto na tela, dado o centro
   const px = (p) => ({
@@ -91,7 +91,7 @@ export function criaMapa(container, opcoes = {}) {
   const ROTA = `M ${A.x.toFixed(1)} ${A.y.toFixed(1)} Q ${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${B.x.toFixed(1)} ${B.y.toFixed(1)}`;
 
   container.innerHTML = `
-  <div class="mapa-telhas">${telhas(cx, cy, z, larg, alt)}</div>
+  <div class="mapa-palco"><div class="mapa-telhas">${telhas(cx, cy, z, larg, alt)}</div>
   <svg class="mapa-svg" width="${larg}" height="${alt}" viewBox="0 0 ${larg} ${alt}" aria-hidden="true">
     <defs>
       <filter id="sombraPino" x="-60%" y="-60%" width="220%" height="220%">
@@ -136,7 +136,12 @@ export function criaMapa(container, opcoes = {}) {
         <circle cx="5.4" cy="3.6" r="2.4" fill="none" stroke="#fff" stroke-width="1.6"/>
       </g>
     </g>
-  </svg>
+  </svg></div>
+  <div class="mapa-zoom">
+    <button class="z-mais" aria-label="Aproximar">+</button>
+    <button class="z-menos" aria-label="Afastar">−</button>
+    <button class="z-centro" aria-label="Enquadrar o trajeto">⤢</button>
+  </div>
   <div class="mapa-credito">
     <span class="trecho">calculando o trajeto…</span>
     <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>
@@ -165,6 +170,8 @@ export function criaMapa(container, opcoes = {}) {
     rota.style.strokeDashoffset = total * (1 - t);
   }
   posiciona(atual);
+
+  const enquadra = ligaGestos(container);
 
   // troca a curva pelo caminho de rua assim que o roteador responder
   let percurso = null;
@@ -208,6 +215,8 @@ export function criaMapa(container, opcoes = {}) {
       };
       quadro = requestAnimationFrame(passo);
     },
+    /** Volta o mapa ao enquadramento que mostra o trajeto inteiro. */
+    enquadra,
     destroi() { cancelAnimationFrame(quadro); },
   };
 }
@@ -290,4 +299,111 @@ export async function rotaDeRua(origem, destino) {
 
   guardado.set(chave, promessa);
   return promessa;
+}
+
+/**
+ * Deixa o mapa na mão da pessoa: arrastar, pinçar e rolar para o zoom.
+ *
+ * O trajeto inteiro raramente cabe bem num retângulo de celular. Sem
+ * poder mexer, quem quer conferir a esquina onde a moto está fica
+ * olhando para um borrão — e "acompanhar a entrega" vira enfeite.
+ *
+ * Reimplementar o mapa a cada gesto seria lento e piscaria as telhas.
+ * Então o gesto mexe só num transform CSS, e o mapa se redesenha de
+ * verdade quando o dedo sai — que é quando as telhas na nova escala
+ * fazem falta.
+ */
+function ligaGestos(container) {
+  let escala = 1, dx = 0, dy = 0;
+  let arrastando = false, x0 = 0, y0 = 0, base = 1, dist0 = 0;
+  const palcoMapa = container.querySelector('.mapa-palco');
+  if (!palcoMapa) return () => {};
+
+  const aplica = () => {
+    palcoMapa.style.transform = `translate(${dx}px, ${dy}px) scale(${escala})`;
+  };
+  // segura o mapa dentro de limites razoaveis: soltar o dedo com o mapa
+  // fora da tela deixaria a pessoa olhando para o nada
+  const limpa = () => {
+    const folga = 260 * escala;
+    dx = Math.max(-folga, Math.min(folga, dx));
+    dy = Math.max(-folga, Math.min(folga, dy));
+    palcoMapa.style.transition = 'transform .28s cubic-bezier(.32,.72,0,1)';
+    aplica();
+    container.classList.toggle('mexido', escala !== 1 || !!dx || !!dy);
+    setTimeout(() => { palcoMapa.style.transition = ''; }, 300);
+  };
+
+  const zoomPor = (f) => {
+    escala = Math.max(0.6, Math.min(6, escala * f));
+    palcoMapa.style.transition = 'transform .22s cubic-bezier(.32,.72,0,1)';
+    aplica();
+    container.classList.add('mexido');
+    setTimeout(() => { palcoMapa.style.transition = ''; }, 240);
+  };
+  const enquadra = () => {
+    escala = 1; dx = 0; dy = 0;
+    palcoMapa.style.transition = 'transform .34s cubic-bezier(.32,.72,0,1)';
+    aplica();
+    container.classList.remove('mexido');
+    setTimeout(() => { palcoMapa.style.transition = ''; }, 360);
+  };
+  container.querySelector('.z-mais')?.addEventListener('click', (e) => { e.stopPropagation(); zoomPor(1.5); });
+  container.querySelector('.z-menos')?.addEventListener('click', (e) => { e.stopPropagation(); zoomPor(1 / 1.5); });
+  container.querySelector('.z-centro')?.addEventListener('click', (e) => { e.stopPropagation(); enquadra(); });
+
+  const doisDedos = (e) => Math.hypot(
+    e.touches[0].clientX - e.touches[1].clientX,
+    e.touches[0].clientY - e.touches[1].clientY);
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) { dist0 = doisDedos(e); base = escala; arrastando = false; }
+    else if (e.touches.length === 1) {
+      arrastando = true; x0 = e.touches[0].clientX - dx; y0 = e.touches[0].clientY - dy;
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && dist0) {
+      escala = Math.max(0.6, Math.min(6, base * (doisDedos(e) / dist0)));
+      aplica();
+    } else if (arrastando && e.touches.length === 1) {
+      dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
+      aplica();
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchend', (e) => {
+    if (e.touches.length) return;
+    arrastando = false; dist0 = 0;
+    if (escala !== 1 || dx || dy) limpa();
+  }, { passive: true });
+
+  // no computador: roda do mouse dá zoom, arrastar com o botão move
+  container.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    escala = Math.max(0.6, Math.min(6, escala * (e.deltaY < 0 ? 1.18 : 1 / 1.18)));
+    aplica();
+    clearTimeout(container._parou);
+    container._parou = setTimeout(limpa, 260);
+  }, { passive: false });
+
+  container.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;
+    arrastando = true; x0 = e.clientX - dx; y0 = e.clientY - dy;
+    container.setPointerCapture(e.pointerId);
+    container.classList.add('arrastando');
+  });
+  container.addEventListener('pointermove', (e) => {
+    if (!arrastando || e.pointerType === 'touch') return;
+    dx = e.clientX - x0; dy = e.clientY - y0; aplica();
+  });
+  container.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'touch' || !arrastando) return;
+    arrastando = false;
+    container.classList.remove('arrastando');
+    if (escala !== 1 || dx || dy) limpa();
+  });
+
+  return enquadra;
 }

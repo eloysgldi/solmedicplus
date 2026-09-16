@@ -169,7 +169,7 @@ function farmacia({ cnpj, razao, fantasia, bairro, gerenteId, comissao = 11 }) {
 // Uma farmácia só: a nossa. O modelo continua aguentando várias — o painel
 // e o cadastro dependem disso — mas a operação é loja própria.
 const matriz = farmacia({ cnpj: '09441233000106', razao: 'Solmedic Comércio de Medicamentos LTDA',
-  fantasia: 'Solmedic+ Matriz', bairro: 'Centro', gerenteId: gerente });
+  fantasia: 'Solmedic+', bairro: 'Centro', gerenteId: gerente });
 
 // farmacêutica responsável técnica + entregador
 if (!um('SELECT id FROM pharmacy_users WHERE pharmacy_id=? AND user_id=?', matriz, farmaceut)) {
@@ -414,5 +414,5 @@ conta(`
   entregador    entregador@solmedic.com.br     moto123
   admin         admin@solmedic.app             admin123
 
-  Solmedic+ Matriz    ${matriz}
+  Solmedic+    ${matriz}
 `);
