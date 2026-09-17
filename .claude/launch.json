@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "cruz-verde",
+      "name": "glowdi-payment",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["server/server.js"],
-      "port": 4173
+      "runtimeArgs": ["C:/Users/jhony/OneDrive/Desktop/Glowdi Payment/server.js"],
+      "port": 3000
+    },
+    {
+      "name": "doacao",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/jhony/OneDrive/Desktop/Doacao/server.mjs"],
+      "port": 4180
     }
   ]
 }

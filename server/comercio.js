@@ -405,3 +405,114 @@ export function defineHorario(pid, dias = []) {
     return todos('SELECT * FROM pharmacy_hours WHERE pharmacy_id=? ORDER BY dia_semana', pid);
   });
 }
+
+/**
+ * ============================================================
+ * CADASTRO DE PRODUTO PELA LOJA
+ *
+ * Até aqui o catálogo era uma lista fechada da plataforma e a loja só
+ * mexia em preço e estoque. Farmácia de verdade vende o que quiser —
+ * dermocosmético, fralda, garrafinha — e esperar alguém "cadastrar no
+ * mestre" é o tipo de dependência que faz o dono desistir do sistema.
+ *
+ * O que continua travado, e é de propósito:
+ *   · controlado da Portaria 344 não entra por tela nenhuma;
+ *   · preço acima do PMC da CMED é recusado, como sempre foi;
+ *   · EAN é a chave do produto: se já existe, atualiza em vez de
+ *     duplicar — catálogo com o mesmo item duas vezes vira estoque
+ *     errado na semana seguinte.
+ * ============================================================
+ */
+const CATEGORIAS = ['dor', 'gripe', 'pressao', 'antibiotico', 'dermo', 'vitaminas',
+  'bebe', 'higiene', 'refrigerado', 'controlado', 'outros'];
+
+export function salvaProduto(pid, dados, autorId) {
+  const {
+    ean, nome, descricao, marca, principio_ativo, dosagem, apresentacao, fabricante,
+    categoria = 'outros', tarja = 'livre', requer_receita = 0, retem_receita = 0,
+    generico = 0, refrigerado = 0, registro_ms, pmc_centavos,
+    preco_centavos, preco_de_centavos, estoque = 0, posicao, ativo = 1,
+  } = dados;
+
+  if (!nome?.trim()) throw new Erro(422, 'NOME_OBRIGATORIO', 'O produto precisa de um nome');
+  if (!/^\d{8,14}$/.test(String(ean ?? ''))) {
+    throw new Erro(422, 'EAN_INVALIDO',
+      'O código de barras precisa ter de 8 a 14 dígitos. É ele que identifica o produto.');
+  }
+  if (!CATEGORIAS.includes(categoria)) {
+    throw new Erro(422, 'CATEGORIA_INVALIDA', `Categoria desconhecida: ${categoria}`);
+  }
+  if (!['livre', 'vermelha', 'preta'].includes(tarja)) {
+    throw new Erro(422, 'TARJA_INVALIDA', `Tarja desconhecida: ${tarja}`);
+  }
+  if (tarja === 'preta') {
+    throw new Erro(422, 'CONTROLADO_FORA_DA_PLATAFORMA',
+      'Medicamento de tarja preta é da Portaria 344 e não pode ser vendido por delivery');
+  }
+  const preco = Number(preco_centavos);
+  if (!Number.isInteger(preco) || preco <= 0) {
+    throw new Erro(422, 'PRECO_INVALIDO', 'O preço tem que ser maior que zero');
+  }
+  if (preco_de_centavos && Number(preco_de_centavos) <= preco) {
+    throw new Erro(422, 'PROMOCAO_INVALIDA',
+      'O preço "de" precisa ser maior que o preço de venda — senão não é promoção, é aumento');
+  }
+  if (pmc_centavos && preco > Number(pmc_centavos)) {
+    throw new Erro(422, 'ACIMA_DO_PMC',
+      `R$ ${(preco / 100).toFixed(2)} passa o preço máximo ao consumidor que você declarou`);
+  }
+
+  return transacao(() => {
+    const ja = um('SELECT * FROM products WHERE ean = ?', ean);
+    // a tarja manda na receita: vermelha sempre exige, e o formulário não
+    // pode deixar as duas coisas se contradizerem
+    const exigeReceita = tarja === 'vermelha' ? 1 : (requer_receita ? 1 : 0);
+
+    roda(`INSERT INTO products (ean,nome,descricao,marca,principio_ativo,dosagem,apresentacao,
+            fabricante,categoria,tarja,requer_receita,retem_receita,controlado_344,refrigerado,
+            generico,registro_ms,pmc_centavos,ativo,criado_por,criado_em)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?)
+          ON CONFLICT(ean) DO UPDATE SET
+            nome=excluded.nome, descricao=excluded.descricao, marca=excluded.marca,
+            principio_ativo=excluded.principio_ativo, dosagem=excluded.dosagem,
+            apresentacao=excluded.apresentacao, fabricante=excluded.fabricante,
+            categoria=excluded.categoria, tarja=excluded.tarja,
+            requer_receita=excluded.requer_receita, retem_receita=excluded.retem_receita,
+            refrigerado=excluded.refrigerado, generico=excluded.generico,
+            registro_ms=excluded.registro_ms, pmc_centavos=excluded.pmc_centavos,
+            ativo=excluded.ativo`,
+      ean, nome.trim(), descricao?.trim() || null, marca?.trim() || null,
+      principio_ativo?.trim() || null, dosagem?.trim() || null, apresentacao?.trim() || null,
+      fabricante?.trim() || null, categoria, tarja, exigeReceita, retem_receita ? 1 : 0,
+      refrigerado ? 1 : 0, generico ? 1 : 0, registro_ms?.trim() || null,
+      pmc_centavos ? Number(pmc_centavos) : null, ativo ? 1 : 0,
+      ja ? (ja.criado_por ?? autorId ?? null) : (autorId ?? null),
+      ja ? (ja.criado_em ?? agora()) : agora());
+
+    // preço e estoque continuam sendo da loja, não do produto
+    defineItem(pid, {
+      ean, preco_centavos: preco,
+      preco_socio_centavos: null,
+      estoque: Number(estoque) || 0,
+      ativo, posicao,
+    });
+    if (preco_de_centavos !== undefined) {
+      roda('UPDATE inventory SET preco_de_centavos = ? WHERE pharmacy_id = ? AND ean = ?',
+        preco_de_centavos ? Number(preco_de_centavos) : null, pid, ean);
+    }
+
+    return um(`SELECT p.*, i.preco_centavos, i.preco_de_centavos, i.estoque, i.posicao,
+                      i.ativo AS ativo_na_loja
+                 FROM products p JOIN inventory i ON i.ean = p.ean
+                WHERE p.ean = ? AND i.pharmacy_id = ?`, ean, pid);
+  });
+}
+
+/** Tira o produto da vitrine sem apagar nada: histórico de venda continua de pé. */
+export function arquivaProduto(pid, ean, ativo) {
+  const i = um('SELECT * FROM inventory WHERE pharmacy_id=? AND ean=?', pid, ean);
+  if (!i) throw new Erro(404, 'FORA_DO_CATALOGO', 'Esse produto não está no seu catálogo');
+  roda('UPDATE inventory SET ativo = ?, atualizado_em = ? WHERE pharmacy_id=? AND ean=?',
+    ativo ? 1 : 0, agora(), pid, ean);
+  return um('SELECT * FROM inventory WHERE pharmacy_id=? AND ean=?', pid, ean);
+}

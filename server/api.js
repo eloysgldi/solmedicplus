@@ -1024,3 +1024,26 @@ r.get('/api/comercio/:pid/alertas', (req, res, p) => {
     parados_ha_20min: parados,
   });
 });
+
+// ============ cadastro de produto pela loja ============
+r.post('/api/comercio/:pid/produtos', async (req, res, p) => {
+  const { u } = exigeLoja(req, p.pid, ['gerente', 'farmaceutico']);
+  json(res, 201, comercio.salvaProduto(p.pid, await corpo(req), u.id));
+});
+
+r.get('/api/comercio/:pid/produtos/:ean', (req, res, p) => {
+  exigeLoja(req, p.pid);
+  const prod = um(
+    `SELECT pr.*, i.preco_centavos, i.preco_de_centavos, i.estoque, i.posicao,
+            i.ativo AS ativo_na_loja
+       FROM products pr LEFT JOIN inventory i ON i.ean = pr.ean AND i.pharmacy_id = ?
+      WHERE pr.ean = ?`, p.pid, p.ean);
+  if (!prod) throw new Erro(404, 'PRODUTO_INEXISTENTE', 'Esse produto não existe');
+  json(res, 200, prod);
+});
+
+r.post('/api/comercio/:pid/produtos/:ean/arquivar', async (req, res, p) => {
+  exigeLoja(req, p.pid, ['gerente', 'farmaceutico']);
+  const b = await corpo(req);
+  json(res, 200, comercio.arquivaProduto(p.pid, p.ean, b.ativo !== false));
+});

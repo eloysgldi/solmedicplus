@@ -156,6 +156,63 @@ const chegou = (depois.itens ?? depois).find((n) => n.tipo === 'entrega_concluid
 ok(!!chegou, `e a loja soube na hora: "${chegou?.titulo ?? ''}"`);
 ok(chegou?.corpo?.includes('Rosana'), 'com o nome de quem entregou', chegou?.corpo);
 
+// ---------- 6. o dono cadastra o que vende ----------
+console.log(cor(1, '\n6. cadastro de produto'));
+const EAN = `789${marca}0`;
+const semEan = await api('POST', `/api/comercio/${L}/produtos`, { token: ger, corpo: {
+  ean: '123', nome: 'Teste', preco_centavos: 1000 } });
+ok(semEan.status === 422 && semEan.dados.erro === 'EAN_INVALIDO',
+   'código de barras curto é recusado — é ele que identifica o produto');
+
+const promoBurra = await api('POST', `/api/comercio/${L}/produtos`, { token: ger, corpo: {
+  ean: EAN, nome: 'Teste', preco_centavos: 5000, preco_de_centavos: 3000 } });
+ok(promoBurra.status === 422 && promoBurra.dados.erro === 'PROMOCAO_INVALIDA',
+   'preço "de" menor que o de venda é recusado — não é promoção, é aumento');
+
+const preta = await api('POST', `/api/comercio/${L}/produtos`, { token: ger, corpo: {
+  ean: EAN, nome: 'Controlado', preco_centavos: 1000, tarja: 'preta' } });
+ok(preta.status === 422 && preta.dados.erro === 'CONTROLADO_FORA_DA_PLATAFORMA',
+   'tarja preta não entra por tela nenhuma');
+
+const acimaPmc = await api('POST', `/api/comercio/${L}/produtos`, { token: ger, corpo: {
+  ean: EAN, nome: 'Caro', preco_centavos: 9000, pmc_centavos: 5000 } });
+ok(acimaPmc.status === 422 && acimaPmc.dados.erro === 'ACIMA_DO_PMC',
+   'preço acima do PMC declarado é recusado');
+
+const prod = await api('POST', `/api/comercio/${L}/produtos`, { token: ger, corpo: {
+  ean: EAN, nome: 'Sérum Antioxidante 30 mL',
+  descricao: 'Vitamina C estabilizada. Uso pela manhã, antes do protetor.',
+  marca: 'Solmedic', categoria: 'dermo', apresentacao: 'frasco 30 mL',
+  preco_centavos: 8990, preco_de_centavos: 12990, estoque: 15, pmc_centavos: 15000 } });
+ok(prod.status === 201, 'produto cadastrado pela loja', prod.dados);
+ok(prod.dados.descricao?.includes('Vitamina C'), 'com a descrição que o cliente vai ler');
+ok(prod.dados.preco_centavos === 8990 && prod.dados.preco_de_centavos === 12990,
+   'preço e preço promocional gravados');
+ok(prod.dados.estoque === 15, 'e o estoque na prateleira');
+
+const naVitrine = (await api('GET', `/api/catalogo/busca?q=${encodeURIComponent('Sérum Antioxidante')}`)).dados;
+ok(naVitrine.itens.some((i) => i.ean === EAN),
+   'e ele já aparece na busca do app do cliente, sem passar por ninguém');
+
+const daPagina = (await api('GET', `/api/catalogo/${EAN}`)).dados;
+ok(daPagina.descricao?.includes('antes do protetor'), 'a descrição chega na página do produto');
+
+const editado = await api('POST', `/api/comercio/${L}/produtos`, { token: ger, corpo: {
+  ean: EAN, nome: 'Sérum Antioxidante 30 mL', categoria: 'dermo',
+  preco_centavos: 7990, estoque: 15 } });
+ok(editado.status === 201 && editado.dados.preco_centavos === 7990,
+   'mandar o mesmo EAN edita em vez de duplicar');
+const contagem = (await api('GET', `/api/comercio/${L}/catalogo?q=Sérum`, { token: ger })).dados;
+ok(contagem.filter((i) => i.ean === EAN).length === 1, 'e o catálogo não ganhou item repetido');
+
+await api('POST', `/api/comercio/${L}/produtos/${EAN}/arquivar`, { token: ger, corpo: { ativo: false } });
+const sumido = (await api('GET', `/api/catalogo/busca?q=${encodeURIComponent('Sérum Antioxidante')}`)).dados;
+ok(!sumido.itens.some((i) => i.ean === EAN), 'arquivar tira da vitrine na hora');
+
+const deOutroDono = await api('POST', `/api/comercio/${L}/produtos`, { token: cli, corpo: {
+  ean: EAN, nome: 'Invasão', preco_centavos: 100 } });
+ok(deOutroDono.status === 403, 'e cliente não cadastra produto na loja de ninguém');
+
 // ---------- 5. sair do turno apaga o rastro ----------
 console.log(cor(1, '\n5. fim de expediente'));
 await api('POST', '/api/entregador/turno', { token: piloto, corpo: { entrando: false } });

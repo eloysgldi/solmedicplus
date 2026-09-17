@@ -463,6 +463,19 @@ CREATE INDEX IF NOT EXISTS idx_pos_courier ON entregador_posicoes(courier_id, cr
 CREATE INDEX IF NOT EXISTS idx_pos_order ON entregador_posicoes(order_id, criado_em);
 `);
 
+// O catálogo nasceu como lista fechada da plataforma. Agora a loja
+// cadastra produto por completo, então ele ganhou o que faltava para
+// existir sozinho: a descrição que o cliente lê e quem o criou.
+for (const [tabela, coluna, tipo] of [
+  ['products', 'descricao', 'TEXT'],
+  ['products', 'marca', 'TEXT'],
+  ['products', 'criado_por', 'TEXT'],
+  ['products', 'criado_em', 'TEXT'],
+]) {
+  const tem = db.prepare(`PRAGMA table_info(${tabela})`).all().some((c) => c.name === coluna);
+  if (!tem) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+}
+
 // colunas que nasceram com o app do entregador
 for (const [tabela, coluna, tipo] of [
   // a loja liga e desliga o rastreamento por entregador

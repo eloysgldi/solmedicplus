@@ -4,6 +4,7 @@ import { telaClientes } from './painel-crm.js';
 import { telaEstoque } from './painel-estoque.js';
 import { telaLoja } from './painel-loja.js';
 import { telaFrota } from './painel-frota.js';
+import { telaProdutoLoja } from './painel-produto.js';
 
 const API = location.origin;
 const $ = (s, r = document) => r.querySelector(s);
@@ -34,6 +35,8 @@ const S = {
   lojaDados: null, horarios: [], config: null,
   // a frota
   frota: [], posicoes: [], alertas: null,
+  // cadastro de produto
+  produtoEdit: null,
 };
 
 async function api(metodo, caminho, corpo) {
@@ -108,7 +111,7 @@ async function carregar() {
   if ((S.aba === 'receitas' || S.aba === 'ruptura') && !S.catalogo.length) {
     S.catalogo = await pega('/catalogo', []);
   }
-  if (S.aba === 'catalogo') S.catalogo = await pega('/catalogo', []);
+  if (S.aba === 'catalogo' && !S.produtoEdit) S.catalogo = await pega('/catalogo', []);
   if (S.aba === 'ruptura') {
     S.ruptura = await pega('/ruptura', []);
     S.recalls = await pega('/recalls', []);
@@ -287,7 +290,7 @@ function painel() {
   if (S.aba === 'retencao') return telaRetencao();
   if (S.aba === 'conversas') return telaConversas();
   if (S.aba === 'ruptura') return telaRuptura();
-  if (S.aba === 'catalogo') return telaCatalogo();
+  if (S.aba === 'catalogo') return S.produtoEdit ? telaProdutoLoja({ S }) : telaCatalogo();
   if (S.aba === 'financeiro') return telaFinanceiro();
   return telaPedidos();
 }
@@ -592,9 +595,12 @@ function telaRuptura() {
  */
 function telaCatalogo() {
   const semFoto = S.catalogo.filter((p) => !p.imagem_url).length;
-  return `<h1>Catálogo</h1>
+  return `<div class="linha" style="align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px"><h1>Catálogo</h1>'
     <p class="sub">O produto é da plataforma; <b>o preço, o estoque e a foto são seus</b>.
-    Editar aqui já muda o app do cliente. O sistema recusa preço acima do PMC da CMED.</p>
+    Editar aqui já muda o app do cliente. O sistema recusa preço acima do PMC da CMED.</p></div>
+      <button class="btn p" data-acao="novo-produto" style="margin-top:6px">+ Novo produto</button>
+    </div>
 
     ${semFoto ? `
       <div class="tira-alertas">
@@ -605,9 +611,9 @@ function telaCatalogo() {
     <div class="card">
       <table>
         <tr><th></th><th>produto</th><th>tarja</th><th style="text-align:right">preço</th>
-            <th style="text-align:right">sócio</th><th style="text-align:right">estoque</th><th>PMC</th></tr>
+            <th style="text-align:right">estoque</th><th>PMC</th></tr>
         ${S.catalogo.map((p) => `
-        <tr>
+        <tr class="clicavel" data-acao="editar-produto" data-ean="${esc(p.ean)}">
           <td style="width:46px">
             <label class="foto-celula" title="${p.imagem_url ? 'trocar a foto' : 'subir foto real'}">
               ${p.imagem_url ? `<img class="mini-foto" src="${esc(p.imagem_url)}" alt="">`
@@ -620,7 +626,6 @@ function telaCatalogo() {
               : `<span class="pill" style="background:#FBE9EC;color:var(--red)">${esc(p.tarja)}</span>`}</td>
           <td style="text-align:right"><input data-preco="${p.ean}" data-socio="${p.preco_socio_centavos ?? ''}"
               data-estoque="${p.estoque}" value="${((p.preco_centavos) / 100).toFixed(2).replace('.', ',')}"></td>
-          <td style="text-align:right" class="mono">${p.preco_socio_centavos ? brl(p.preco_socio_centavos) : '—'}</td>
           <td style="text-align:right"><input data-estoque-ean="${p.ean}" data-preco2="${p.preco_centavos}"
               data-socio="${p.preco_socio_centavos ?? ''}" value="${p.estoque}"
               style="width:62px;${p.estoque <= 0 ? 'border-color:var(--red);color:var(--red)' : ''}"></td>
@@ -734,6 +739,56 @@ function telasNovas(a, b, base, pid) {
     const motivo = prompt('Motivo da baixa: vencido, quebra, avaria…');
     if (!motivo) return true;
     acao(() => api('POST', `${base}/estoque/perda`, { lote_id: lote, qtd: Number(quantos), motivo }));
+    return true;
+  }
+
+  /* ---------- cadastro de produto ---------- */
+  if (a === 'novo-produto') { S.produtoEdit = {}; desenhar(); return true; }
+  if (a === 'fechar-produto') { S.produtoEdit = null; carregar(); return true; }
+  if (a === 'editar-produto') {
+    acao(async () => { S.produtoEdit = await api('GET', `${base}/produtos/${b.dataset.ean}`); });
+    return true;
+  }
+  if (a === 'arquivar-produto') {
+    const ativo = S.produtoEdit?.ativo_na_loja === 0;
+    acao(() => api('POST', `${base}/produtos/${b.dataset.ean}/arquivar`, { ativo }));
+    return true;
+  }
+  if (a === 'apagar-foto-prod') {
+    if (!confirm('Remover a foto deste produto?')) return true;
+    acao(async () => {
+      await api('DELETE', `${base}/catalogo/${b.dataset.ean}/foto`);
+      S.produtoEdit = await api('GET', `${base}/produtos/${b.dataset.ean}`);
+    });
+    return true;
+  }
+  if (a === 'salvar-produto') {
+    const f = b.closest('.bloco-produto');
+    const v = (n) => f.querySelector(`[name="${n}"]`)?.value?.trim() ?? '';
+    const marcado = (n) => !!f.querySelector(`[name="${n}"]`)?.checked;
+    // aceita "49,90", "49.90" e "4990" digitado com vírgula: o dono não
+    // deveria ter que lembrar de qual formato o sistema quer
+    const cent = (t) => {
+      if (!t) return null;
+      const n = parseFloat(String(t).replace(/[^0-9,.-]/g, '').replace(',', '.'));
+      return Number.isFinite(n) ? Math.round(n * 100) : null;
+    };
+    acao(async () => {
+      const salvo = await api('POST', `${base}/produtos`, {
+        ean: v('ean'), nome: v('nome'), descricao: v('descricao'), marca: v('marca'),
+        fabricante: v('fabricante'), apresentacao: v('apresentacao'),
+        principio_ativo: v('principio_ativo'), dosagem: v('dosagem'),
+        categoria: v('categoria'), tarja: v('tarja'),
+        requer_receita: v('tarja') === 'vermelha',
+        retem_receita: marcado('retem_receita'), generico: marcado('generico'),
+        refrigerado: marcado('refrigerado'), registro_ms: v('registro_ms'),
+        pmc_centavos: cent(v('pmc_centavos')),
+        preco_centavos: cent(v('preco_centavos')),
+        preco_de_centavos: cent(v('preco_de_centavos')),
+        estoque: Number(v('estoque')) || 0, posicao: v('posicao') || null,
+      });
+      S.produtoEdit = salvo;
+    });
     return true;
   }
 
