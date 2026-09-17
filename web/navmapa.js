@@ -197,8 +197,8 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
               stroke-linecap="round" stroke-linejoin="round"/>
         <g class="nav-paradas"></g>
       </svg>
-    </div>
-    <div class="nav-seta">
+
+      <div class="nav-seta">
       <svg viewBox="0 0 76 76" aria-hidden="true">
         <defs>
           <radialGradient id="halo" cx="50%" cy="50%" r="50%">
@@ -226,23 +226,42 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
         <circle cx="38" cy="38" r="21" fill="#0B1220" opacity=".9"/>
         <circle cx="38" cy="38" r="21" fill="none" stroke="#2E6BFF" stroke-width="1.6" opacity=".55"/>
 
-        <g filter="url(#sombraSeta)">
+        <g class="seta-corpo" filter="url(#sombraSeta)">
           <path d="M38 17 L51 49 L38 42 Z" fill="url(#faceEscura)"/>
           <path d="M38 17 L25 49 L38 42 Z" fill="url(#faceClara)"/>
           <path d="M38 17 L38 42" stroke="#EAFBFF" stroke-width="1" opacity=".5"/>
         </g>
-      </svg>
+        </svg>
+      </div>
     </div>`;
 
   const telhas = container.querySelector('.nav-telhas');
   const palco = container.querySelector('.nav-palco');
   const svg = container.querySelector('.nav-svg');
+  const seta = container.querySelector('.nav-seta');
+  const corpoSeta = container.querySelector('.seta-corpo');
   const rotaEl = svg.querySelector('.nav-rota');
   const sombraEl = svg.querySelector('.nav-rota-sombra');
   const andadoEl = svg.querySelector('.nav-andado');
   const paradasEl = svg.querySelector('.nav-paradas');
 
   let centro = null, giro = 0, pontos = [], paradas = [], seguindo = true;
+  // o rumo da moto e o giro do mapa sao duas coisas: solto no norte o
+  // mapa para de girar, mas a seta continua tendo para onde apontar
+  let rumoSeta = 0;
+
+  /**
+   * O angulo mais perto, sem dar a volta.
+   *
+   * O rumo chega sempre entre 0 e 360, entao apontar para o norte era
+   * pular de 359 para 1 — e um `transition` nao sabe que 359 e 1 sao
+   * vizinhos: ele anima os 358 graus do caminho longo. Na moto isso e
+   * o mapa inteiro rodopiando toda vez que a pessoa aponta para o
+   * norte. Aqui o angulo vira continuo: pode passar de 360 e ficar
+   * negativo, porque o que importa e a distancia ate o anterior.
+   */
+  const aproxima = (atual, alvo) =>
+    atual + (((((alvo - atual) % 360) + 540) % 360) - 180);
   // o palco e maior que a tela (inset negativo) para o giro nunca mostrar
   // canto vazio -- entao a medida que vale e a DELE, nao a do container
   let larg = palco.clientWidth || 520, alt = palco.clientHeight || 720;
@@ -337,18 +356,56 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
     }).join('');
   }
 
+  /**
+   * Onde o palco fica, e para onde a seta aponta.
+   *
+   * Duas coisas estavam erradas aqui, e as duas apareciam como a mesma
+   * queixa: a seta saia do lugar.
+   *
+   * A primeira: a seta era irma do palco, nao filha. Ficava pregada em
+   * 54% da tela enquanto as telhas e a rota andavam no transform do
+   * palco — arrastar ou dar zoom levava o mapa embora e deixava a seta
+   * para tras, marcando um ponto que nao era o da moto. Agora ela mora
+   * DENTRO do palco, no centro dele, que e exatamente onde `px(centro)`
+   * cai. Andam no mesmo transform: nao tem como se separarem.
+   *
+   * A segunda: o palco girava em volta de 50%/62%, e o ponto da moto e o
+   * centro, 50%/50%. Girar em volta de um ponto que nao e o da moto poe a
+   * moto numa orbita de uns 150px — a cada tremida da bussola a posicao
+   * real passeava pela tela. Com a origem no centro, girar prende a moto,
+   * e o mundo e que vira em volta dela, como tem que ser.
+   *
+   * Girar, quem gira e o corpo da seta, em `rumo - giro`:
+   *   · seguindo a moto, giro == rumo, a conta da zero e a seta aponta
+   *     para cima — porque quem virou foi o mapa;
+   *   · solto no norte, giro == 0, e a seta aponta para o rumo de verdade.
+   *
+   * O halo e a sombra do chao ficam fora do giro (contra-giram +giro):
+   * sombra que passeia em volta do objeto entrega que aquilo e um desenho.
+   */
+  function aplicaPalco() {
+    palco.style.transform =
+      'translate(var(--gx,0px), var(--gy,0px)) scale(var(--gz,1))'
+      + ` translateY(12%) rotate(${(-giro).toFixed(1)}deg)`;
+    seta.style.setProperty('--anti', `${giro.toFixed(1)}deg`);
+    corpoSeta.setAttribute('transform',
+      `rotate(${(rumoSeta - giro).toFixed(1)} 38 38)`);
+  }
   return {
     /** Move o mapa para a posicao nova, girando na direcao do movimento. */
     vai(pos, { rumoGraus = null, andadoAte = 0 } = {}) {
       centro = pos;
-      if (seguindo && rumoGraus !== null && !Number.isNaN(rumoGraus)) giro = rumoGraus;
+      if (rumoGraus !== null && !Number.isNaN(rumoGraus)) {
+        rumoSeta = aproxima(rumoSeta, rumoGraus);
+        if (seguindo) giro = aproxima(giro, rumoGraus);
+      }
       larg = palco.clientWidth || larg;
       alt = palco.clientHeight || alt;
       svg.setAttribute('width', larg);
       svg.setAttribute('height', alt);
       svg.setAttribute('viewBox', `0 0 ${larg} ${alt}`);
       // o piloto fica no terco de baixo: o que importa e o que vem pela frente
-      palco.style.transform = `translate(var(--gx,0px), var(--gy,0px)) scale(var(--gz,1)) translateY(12%) rotate(${-giro}deg)`;
+      aplicaPalco();
       pintaTelhas();
       // a rota acompanha o mesmo deslocamento das telhas, em vez de ser
       // recalculada ponto a ponto a cada segundo
@@ -367,7 +424,11 @@ export function criaNavegacao(container, { zoom = 17 } = {}) {
       () => container.classList.add('mexido'),
       () => container.classList.remove('mexido')),
     /** Solta o giro: o mapa volta a apontar para o norte. */
-    soltaNorte() { seguindo = false; giro = 0; palco.style.transform = 'translate(var(--gx,0px), var(--gy,0px)) scale(var(--gz,1)) translateY(12%)'; },
+    soltaNorte() {
+      // o norte mais perto, nao o zero: de 715 graus, zero sao duas
+      // voltas de rodopio para chegar na mesma direcao
+      seguindo = false; giro = Math.round(giro / 360) * 360; aplicaPalco();
+    },
     voltaASeguir() { seguindo = true; },
     get seguindo() { return seguindo; },
   };
@@ -483,6 +544,11 @@ function ligaGestosNav(container, palco, aoMexer, aoSoltar) {
     palco.style.setProperty('--gx', `${dx}px`);
     palco.style.setProperty('--gy', `${dy}px`);
     palco.style.setProperty('--gz', escala);
+    // o inverso vai pronto: `calc(1 / var(--gz))` so computa com o --gz
+    // registrado por @property, e onde nao registra o transform inteiro
+    // cai fora — a seta iria parar no canto da tela. Uma divisao aqui
+    // custa nada e funciona em tudo
+    palco.style.setProperty('--gzi', 1 / escala);
   };
   const mexeu = () => {
     clearTimeout(volta);
