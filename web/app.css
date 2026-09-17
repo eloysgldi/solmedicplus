@@ -1482,3 +1482,204 @@ a{color:inherit}
   100%{r:30;opacity:0}
 }
 .moto{transition:transform .9s cubic-bezier(.32,.72,0,1)}
+
+/* ============================================================
+   A HOME, REDESENHADA
+
+   O cabeçalho deixou de ser uma faixa e virou um lugar: gradiente que
+   nasce no canto, saudação em duas linhas com o nome em peso alto, e o
+   endereço como pílula — não como texto solto que se confunde com o
+   resto. A busca ganhou altura e um brilho de foco, porque é o que mais
+   gente toca.
+
+   O ritmo vertical passou a ser um só: toda seção tem a mesma distância
+   do que veio antes. Era isso que fazia a tela parecer remendada — cada
+   bloco tinha nascido com a sua própria margem.
+   ============================================================ */
+
+.capa{
+  position:relative;
+  padding:0 18px 18px;
+  background:
+    radial-gradient(120% 62% at 88% -8%, rgba(99,160,255,.34) 0%, rgba(99,160,255,0) 58%),
+    radial-gradient(130% 78% at 6% -4%, #D9E6FF 0%, rgba(217,230,255,0) 64%),
+    linear-gradient(176deg, #E9F0FD 0%, var(--bg) 82%);
+  overflow:hidden;
+}
+/* um véu de luz atravessando o canto: dá profundidade sem pedir imagem */
+.capa::after{
+  content:"";position:absolute;right:-70px;top:-120px;width:280px;height:280px;
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle, rgba(255,255,255,.75) 0%, rgba(255,255,255,0) 68%);
+}
+.capa > *{position:relative;z-index:1}
+
+.fila-marca{display:flex;align-items:center;gap:9px;padding:8px 0 4px}
+.fila-marca .logotipo{flex:1;min-width:0}
+
+h1.ola{
+  font-family:var(--disp);font-size:clamp(27px,8.4vw,34px);line-height:1.04;
+  letter-spacing:-.035em;margin:12px 0 0;color:var(--ink);
+  font-variation-settings:"wdth" 104,"wght" 560;
+}
+h1.ola b{font-variation-settings:"wdth" 108,"wght" 830;font-weight:inherit}
+
+/* o endereço é uma pílula: texto solto ali se confundia com a saudação */
+.end{
+  display:inline-flex;align-items:center;gap:7px;margin-top:11px;max-width:100%;
+  padding:7px 13px 7px 9px;border-radius:100px;background:rgba(255,255,255,.8);
+  border:1px solid rgba(255,255,255,.95);box-shadow:var(--s1);
+  font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;
+  backdrop-filter:blur(6px);
+}
+.end .onde{overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-weight:600}
+.end:active{transform:scale(.97)}
+.alfinete-mini{
+  width:16px;height:16px;flex:none;border-radius:50%;background:var(--brand);position:relative;
+}
+.alfinete-mini::after{content:"";position:absolute;inset:0;margin:auto;width:5px;height:5px;
+  border-radius:50%;background:#fff}
+
+.busca{
+  margin:16px 0 0;height:56px;border-radius:18px;background:var(--surface);
+  display:flex;align-items:center;gap:11px;padding:0 16px;width:100%;
+  border:1px solid rgba(255,255,255,.95);
+  box-shadow:0 1px 2px rgba(7,15,30,.05), 0 14px 30px -18px rgba(17,56,180,.55);
+  transition:transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .22s ease;
+}
+.busca:active{transform:scale(.988)}
+.busca .lupa{color:var(--brand)}
+
+/* a loja virou linha do cabeçalho, sem cartão e sem sombra própria */
+.tira-loja{
+  display:flex;align-items:center;gap:7px;margin:14px 0 0;padding:0;
+  background:none;box-shadow:none;border-radius:0;
+  font-size:12.3px;color:var(--ink-2);overflow:hidden;white-space:nowrap;
+}
+
+/* ---------- ritmo: toda seção respira igual ---------- */
+.bloco{margin-top:26px}
+.bloco:first-of-type{margin-top:22px}
+.secao{display:flex;align-items:baseline;gap:10px;margin:0 18px 13px}
+.secao h2{
+  font-family:var(--disp);font-size:19.5px;letter-spacing:-.028em;margin:0;
+  font-variation-settings:"wdth" 106,"wght" 780;
+}
+.pilha-avisos{display:grid;gap:9px;margin-top:18px}
+.pilha-avisos .andamento{margin-bottom:0}
+
+/* ---------- sintomas: cartão em vez de pílula ---------- */
+.trilho-sintomas{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 8px;
+  scrollbar-width:none;scroll-snap-type:x proximity}
+.trilho-sintomas::-webkit-scrollbar{display:none}
+.pilula-sintoma{
+  --c:var(--brand);
+  flex:none;width:104px;min-height:104px;padding:13px 12px;border-radius:19px;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;
+  background:var(--surface);box-shadow:var(--s2);text-align:left;scroll-snap-align:start;
+  border:1px solid rgba(255,255,255,.9);
+  transition:transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .2s ease;
+  position:relative;overflow:hidden;
+}
+/* a cor do sintoma pinta o canto do cartão, não o fundo inteiro: assim
+   oito deles lado a lado continuam legíveis */
+.pilula-sintoma::before{
+  content:"";position:absolute;right:-26px;top:-26px;width:72px;height:72px;border-radius:50%;
+  background:var(--c);opacity:.09;
+}
+.pilula-sintoma:active{transform:scale(.955)}
+.pilula-sintoma .ic{
+  width:38px;height:38px;border-radius:13px;display:grid;place-items:center;flex:none;
+  background:color-mix(in srgb, var(--c) 13%, transparent);color:var(--c);
+}
+.pilula-sintoma .ic svg{width:21px;height:21px}
+.pilula-sintoma .rot{
+  font-size:12.8px;font-weight:600;line-height:1.25;color:var(--ink);white-space:normal;
+  letter-spacing:-.01em;
+}
+.pilula-sintoma.outro{border:1px dashed var(--line-2);background:var(--wash);box-shadow:none}
+.pilula-sintoma.outro .rot{color:var(--brand)}
+
+/* ---------- o rodapé da home ---------- */
+.pe-home{margin:34px 18px calc(var(--doca-altura,96px) + 18px)}
+.nota-area{font-size:12.3px;color:var(--ink-3);line-height:1.55;margin:0}
+.assinatura{
+  display:flex;align-items:center;gap:10px;margin-top:18px;padding-top:16px;
+  border-top:1px solid var(--line);
+}
+.assinatura span{font-size:11px;color:var(--ink-3);line-height:1.45}
+.assinatura svg{opacity:.4;flex:none}
+
+/* ---------- contínuo: menos etiqueta, mais produto ---------- */
+.continuo .cta b{font-weight:700;opacity:.85;margin-left:auto}
+
+/* ============================================================
+   REFINOS DA HOME
+   Três coisas que a tela fazia errado e uma que fazia feio.
+   ============================================================ */
+
+/* 1. O gutter que sumia.
+   `scroll-snap-align:start` encosta o cartão no início do scrollport,
+   e o scrollport ignora o padding — então o navegador rolava 18px
+   sozinho e comia a margem esquerda do primeiro cartão de todo
+   carrossel. `scroll-padding-inline` é o que diz onde o começo é. */
+.trilho, .trilho-sintomas{ scroll-padding-inline:18px }
+
+/* 2. O alvo que virou um φ.
+   Era um anel com uma barra vertical atravessando (a horizontal
+   dependia de um box-shadow que colapsava). Agora são quatro tiques
+   em volta do anel — mira de verdade. */
+.mini-alvo{
+  width:36px;height:36px;border-radius:12px;
+  background:color-mix(in srgb, var(--brand) 10%, transparent);
+}
+.mini-alvo::before{width:11px;height:11px;border-width:2.4px}
+.mini-alvo::after{
+  width:26px;height:26px;background:
+    linear-gradient(var(--brand),var(--brand)) top center/2.4px 5px no-repeat,
+    linear-gradient(var(--brand),var(--brand)) bottom center/2.4px 5px no-repeat,
+    linear-gradient(var(--brand),var(--brand)) left center/5px 2.4px no-repeat,
+    linear-gradient(var(--brand),var(--brand)) right center/5px 2.4px no-repeat;
+  box-shadow:none;border-radius:0;
+}
+.convite-gps.fina{align-items:center;gap:13px}
+
+/* 3. Os avisos da casa.
+   Eram faixas inteiras de cor — vermelho sangue, mostarda — empilhadas
+   logo abaixo de um cartão branco. Parecia alerta de sistema, não
+   recado de farmácia. Agora todos têm a mesma forma do cartão branco
+   ao lado; o que muda é o trilho de cor na borda e um véu do tom no
+   topo. A urgência continua legível sem gritar. */
+.pilha-avisos .andamento{
+  --t:var(--brand);
+  margin:0 18px;width:calc(100% - 36px);padding:15px 16px;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--s2);position:relative;overflow:hidden;
+}
+.pilha-avisos .andamento::after{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--t);
+}
+.pilha-avisos .andamento .tx b{color:var(--ink);font-size:14.5px}
+.pilha-avisos .andamento .tx span{color:var(--ink-3);opacity:1}
+.pilha-avisos .andamento > svg{color:var(--ink-3);flex:none}
+.pilha-avisos .andamento .pulso{
+  width:10px;height:10px;background:var(--t);
+  box-shadow:0 0 0 0 color-mix(in srgb, var(--t) 60%, transparent);
+  animation:pulso-tom 2s ease-out infinite;
+}
+@keyframes pulso-tom{
+  70%{box-shadow:0 0 0 10px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+.pilha-avisos .urgente{
+  --t:#D32642;
+  background:linear-gradient(180deg, #FFF4F5 0%, var(--surface) 72%);
+  border-color:#F6DCE0;
+}
+.pilha-avisos .atencao{
+  --t:#D0870F;
+  background:linear-gradient(180deg, #FFF9EC 0%, var(--surface) 72%);
+  border-color:#F3E3C4;
+}
+.pilha-avisos .calmo{--t:var(--brand)}

@@ -115,16 +115,34 @@ function cardProduto(p) {
 
 
 /* ============ tela: início ============ */
+/**
+ * ============================================================
+ * A HOME
+ *
+ * Reescrita em torno de uma pergunta: o que essa pessoa veio fazer aqui?
+ *
+ * A resposta quase sempre é uma de três — acompanhar uma entrega que
+ * está a caminho, resolver um sintoma que apareceu agora, ou repetir
+ * algo que ela já comprou. A tela passou a ter essa ordem, e cada bloco
+ * só aparece quando tem o que dizer.
+ *
+ * O que saiu: a faixa da loja solta no meio do fluxo (virou uma linha
+ * dentro do cabeçalho), o cartão da farmácia no rodapé (repetia a mesma
+ * informação três telas abaixo) e a grade de categorias (foi para a
+ * busca). Três blocos a menos, e a tela respira.
+ * ============================================================
+ */
 function telaInicio() {
   const d = S.inicio;
   if (!d) return esqueletoInicio();
   const end = S.dados.enderecos?.find((e) => e.id === S.enderecoId) ?? d.endereco;
   const cont = d.continuos[0];
-  const cats = d.categorias.filter((c) => CATS[c.categoria]).slice(0, 8);
+  const primeiro = d.user ? esc(d.user.nome.split(' ')[0]) : '';
 
   return `
   <div class="tela" id="tela"><div class="rolagem">
-    <div class="capa">
+
+    <header class="capa">
       <div class="fila-marca">
         ${logotipo({ tam: 20 })}
         <button class="redondo" data-ir="avisos" aria-label="Avisos">${IC.sino}
@@ -132,112 +150,140 @@ function telaInicio() {
         <button class="redondo" data-ir="carrinho" aria-label="Carrinho">${IC.carrinho}
           ${totalItens() ? `<span class="selo">${totalItens()}</span>` : ''}</button>
       </div>
-      <div class="local">
-        <div class="txt">
-          <div class="ola">${d.saudacao}${d.user ? ', ' + esc(d.user.nome.split(' ')[0]) : ''}</div>
-          <button class="end" data-enderecos="1">Entregar em <b>${esc(end?.logradouro ?? 'escolher endereço')}${end?.numero ? ', ' + esc(end.numero) : ''}</b>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
-        </div>
-      </div>
+
+      <h1 class="ola">${d.saudacao}${primeiro ? `,<br><b>${primeiro}</b>` : ''}</h1>
+
+      <button class="end" data-enderecos="1">
+        <span class="alfinete-mini"></span>
+        <span class="onde">${esc(end?.logradouro ?? 'Escolher endereço')}${
+          end?.numero ? `, ${esc(end.numero)}` : ''}</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+
       <button class="busca" data-ir="busca">
         <span class="lupa">${IC.busca}</span>
         <span class="dica">Busque <b id="rodizio">dipirona</b><span class="cursor"></span></span>
       </button>
-    </div>
 
-    <div class="tira-loja">
-      <span class="ponto-aberto"></span>
-      <b>${esc(d.farmacia?.nome ?? 'Solmedic+')}</b>
-      <span class="sep">·</span><span>aberta agora</span>
-      <span class="sep">·</span><span class="prazo-loja">chega em 40 min</span>
-    </div>
+      <!-- a loja virou uma linha do cabeçalho: era uma faixa solta no meio
+           do fluxo dizendo o que já estava escrito no topo -->
+      <div class="tira-loja">
+        <span class="ponto-aberto"></span>
+        <b>${esc(d.farmacia?.nome ?? 'Solmedic+')}</b>
+        <span class="sep">·</span><span>aberta agora</span>
+        <span class="sep">·</span><span class="prazo-loja">chega em 40 min</span>
+      </div>
+    </header>
 
     ${cartaoLocalizacao(end)}
 
-    <div class="secao"><h2>O que você está sentindo?</h2></div>
-    <div class="trilho-sintomas escalona">
-      ${(S.dados.sintomas ?? []).slice(0, 8).map((sm) => {
-        const cor = corDoSintoma(sm.id, sm.icone);
-        return `<button class="pilula-sintoma" data-sintoma="${esc(sm.id)}">
-          <span class="ic" style="background:${cor}1F;color:${cor}">${pictogramaSintoma(sm.id, sm.icone)}</span>
-          ${esc(sm.rotulo)}</button>`;
-      }).join('')}
-      <button class="pilula-sintoma outro" data-ir="conversa">
-        <span class="ic" style="background:var(--wash);color:var(--brand)">${IC.balao}</span>
-        Outra coisa? Pergunte</button>
-    </div>
+    ${avisosDaCasa(d)}
 
-    ${d.armario?.recolhidos || d.armario?.vencendo || d.armario?.vencidos ? `
-      <button class="andamento ${d.armario.recolhidos || d.armario.vencidos ? 'urgente' : 'atencao'}"
-        data-ir="armario">
-        <span class="pulso"></span>
-        <span class="tx"><b>${d.armario.recolhidos
-          ? 'Um lote que você tem foi recolhido'
-          : d.armario.vencidos ? 'Tem remédio vencido no seu armário'
-          : `${d.armario.vencendo} ${d.armario.vencendo === 1 ? 'item vencendo' : 'itens vencendo'}`}</b>
-          <span>toque para ver o que fazer</span></span>
-        ${IC.seta}
-      </button>` : ''}
-
-    ${d.a_avaliar && !d.pedido_em_andamento ? `
-      <button class="andamento" data-ir="pedido/${d.a_avaliar.id}">
-        <span class="pulso" style="background:#FFD98A"></span>
-        <span class="tx"><b>Como foi o ${esc(d.a_avaliar.codigo)}?</b>
-          <span>sua nota ajuda a gente a melhorar</span></span>
-        ${IC.seta}
-      </button>` : ''}
+    <section class="bloco">
+      <div class="secao"><h2>O que você está sentindo?</h2>
+        <span class="nota">a gente monta a prateleira</span></div>
+      <div class="trilho-sintomas escalona">
+        ${(S.dados.sintomas ?? []).slice(0, 8).map((sm) => {
+          const cor = corDoSintoma(sm.id, sm.icone);
+          return `<button class="pilula-sintoma" data-sintoma="${esc(sm.id)}"
+            style="--c:${cor}">
+            <span class="ic">${pictogramaSintoma(sm.id, sm.icone)}</span>
+            <span class="rot">${esc(sm.rotulo)}</span></button>`;
+        }).join('')}
+        <button class="pilula-sintoma outro" data-ir="conversa" style="--c:var(--brand)">
+          <span class="ic">${IC.balao}</span>
+          <span class="rot">Outra coisa?<br>Pergunte</span></button>
+      </div>
+    </section>
 
     ${cont ? `
-      <div class="secao"><h2>Continuar tratamento</h2></div>
-      <div class="continuo">
-        <span class="arte">${embalagem(cont, { perto: true })}</span>
-        <span class="tx">
-          <span class="tag">${IC.receita.replace('21','12').replace('21','12')} receita com saldo</span>
-          <h3>${esc(cont.nome)}</h3>
-          <div class="sub">${esc(cont.apresentacao ?? '')}</div>
-          <div class="saldo">${Array.from({ length: cont.qtd_prescrita }, (_, i) =>
-            `<i class="${i < cont.saldo ? 'tem' : ''}"></i>`).join('')}
-            <span>${cont.saldo} de ${cont.qtd_prescrita} caixas</span></div>
-          <button class="cta" data-add="${cont.ean}">${IC.mais} Pedir de novo<b style="font-weight:700;opacity:.8">${brl(cont.preco_centavos)}</b></button>
-        </span>
-      </div>` : ''}
-
-    ${/*
-        A grade de categorias saiu daqui.
-        Oito quadradinhos ocupavam meia tela da home para dizer o que a
-        farmácia vende — informação que a pessoa já sabe. Quem chega na
-        home quer resolver um sintoma ou repetir uma compra; quem quer
-        navegar por prateleira está na busca, e é lá que a grade mora
-        agora, atrás de um botão.
-      */''}
+      <section class="bloco">
+        <div class="secao"><h2>Continuar tratamento</h2>
+          <span class="nota">receita com saldo</span></div>
+        <div class="continuo">
+          <span class="arte">${embalagem(cont, { perto: true })}</span>
+          <span class="tx">
+            <h3>${esc(cont.nome)}</h3>
+            <div class="sub">${esc(cont.apresentacao ?? '')}</div>
+            <div class="saldo">${Array.from({ length: cont.qtd_prescrita }, (_, i) =>
+              `<i class="${i < cont.saldo ? 'tem' : ''}"></i>`).join('')}
+              <span>${cont.saldo} de ${cont.qtd_prescrita} caixas</span></div>
+            <button class="cta" data-add="${cont.ean}">${IC.mais} Pedir de novo
+              <b>${brl(cont.preco_centavos)}</b></button>
+          </span>
+        </div>
+      </section>` : ''}
 
     ${d.ofertas.length ? `
-      <div class="secao"><h2>Ofertas de hoje</h2><span class="mais" data-ir="busca">ver tudo</span></div>
-      <div class="trilho escalona">${d.ofertas.map(cardProduto).join('')}</div>` : ''}
+      <section class="bloco">
+        <div class="secao"><h2>Ofertas de hoje</h2>
+          <span class="mais" data-ir="busca">ver tudo</span></div>
+        <div class="trilho escalona">${d.ofertas.map(cardProduto).join('')}</div>
+      </section>` : ''}
 
     ${barraFarmaceutico()}
 
     ${d.recomprar.length ? `
-      <div class="secao" style="margin-top:22px"><h2>Você já comprou</h2></div>
-      <div class="trilho">${d.recomprar.map(cardProduto).join('')}</div>` : ''}
+      <section class="bloco">
+        <div class="secao"><h2>Você já comprou</h2>
+          <span class="nota">é só repetir</span></div>
+        <div class="trilho">${d.recomprar.map(cardProduto).join('')}</div>
+      </section>` : ''}
 
-    <div class="secao"><h2>A farmácia</h2><span class="nota">é a nossa</span></div>
-    <button class="cartao-loja" data-ir="conta">
-      <span class="lg">${marca({ tam: 42 })}</span>
-      <span class="tx"><b>${esc(d.farmacia?.nome ?? 'Solmedic+')}</b>
-        <span>${esc(d.farmacia?.bairro ?? '')} · aberta agora · entrega em 40 min</span></span>
-      <span class="ponto"></span>
-    </button>
-    ${d.fora_da_area ? `
-      <div class="caixa-aviso a-hot" style="margin:14px 18px 0">
-        <h4>Ainda não chegamos aí</h4>
-        Seu endereço está em ${esc(d.endereco?.bairro ?? '')}, fora da nossa área.
-        Hoje entregamos em ${(d.area ?? []).join(', ')}.
-      </div>` : `
-      <p class="nota-area" style="margin:12px 18px 0">
-        Entregamos em ${(d.area ?? []).join(', ')}. Cresce conforme a moto dá conta.</p>`}
+    <footer class="pe-home">
+      ${d.fora_da_area ? `
+        <div class="caixa-aviso a-hot">
+          <h4>Ainda não chegamos aí</h4>
+          Seu endereço está em ${esc(d.endereco?.bairro ?? '')}, fora da nossa área.
+          Hoje entregamos em ${(d.area ?? []).join(', ')}.
+        </div>`
+      : `<p class="nota-area">Entregamos em ${(d.area ?? []).join(', ')}.
+           Cresce conforme a moto dá conta.</p>`}
+      <div class="assinatura">
+        ${marca({ tam: 26 })}
+        <span>${esc(d.farmacia?.nome ?? 'Solmedic+')} · CNPJ e responsável técnica na sua conta</span>
+      </div>
+    </footer>
   </div></div>`;
 }
+
+/**
+ * Os avisos que a casa tem para esta pessoa.
+ *
+ * Eram dois blocos soltos no meio da home, cada um com o seu estilo.
+ * Viraram uma pilha só, com a mesma forma — e entram por ordem de
+ * urgência: lote recolhido antes de remédio vencendo, remédio vencendo
+ * antes de "avalie seu pedido".
+ */
+function avisosDaCasa(d) {
+  const linhas = [];
+  const arm = d.armario ?? {};
+
+  if (arm.recolhidos) {
+    linhas.push(['urgente', 'Um lote que você tem foi recolhido',
+      'pare de usar — toque para ver o que fazer', 'armario']);
+  } else if (arm.vencidos) {
+    linhas.push(['urgente', 'Tem remédio vencido no seu armário',
+      'toque para ver qual', 'armario']);
+  } else if (arm.vencendo) {
+    linhas.push(['atencao', `${arm.vencendo} ${arm.vencendo === 1 ? 'item vencendo' : 'itens vencendo'}`,
+      'ainda dá tempo de usar', 'armario']);
+  }
+  if (d.a_avaliar && !d.pedido_em_andamento) {
+    linhas.push(['calmo', `Como foi o ${esc(d.a_avaliar.codigo)}?`,
+      'sua nota ajuda a gente a melhorar', `pedido/${d.a_avaliar.id}`]);
+  }
+  if (!linhas.length) return '';
+
+  return `<div class="pilha-avisos">${linhas.map(([tom, titulo, sub, ir]) => `
+    <button class="andamento ${tom}" data-ir="${ir}">
+      <span class="pulso"></span>
+      <span class="tx"><b>${titulo}</b><span>${sub}</span></span>
+      ${IC.seta}
+    </button>`).join('')}</div>`;
+}
+
 
 function esqueletoInicio() {
   return `<div class="tela"><div class="rolagem">
